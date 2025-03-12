@@ -6,6 +6,46 @@ import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../config/contract';
 
+type BetHistoryItem = {
+  result: 'win' | 'lose';
+  amount: number;
+  timestamp: number;
+};
+
+const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
+  console.log('BetHistory render:', history);
+  
+  if (!history || history.length === 0) {
+    return (
+      <div className="w-full bg-gray-800/50 p-4 rounded-lg mb-6 text-center">
+        <h3 className="text-lg font-semibold mb-2">Recent Flips</h3>
+        <p className="text-gray-400">No bets yet. Make your first bet!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full bg-gray-800 p-4 rounded-lg mb-6 overflow-x-auto">
+      <h3 className="text-lg font-semibold mb-3 text-center">Recent Flips</h3>
+      <div className="flex justify-center space-x-2">
+        {history.map((bet, index) => (
+          <div
+            key={index}
+            className={`flex flex-col items-center p-2 rounded-lg min-w-[80px] ${
+              bet.result === 'win' ? 'bg-green-600/20' : 'bg-red-600/20'
+            }`}
+          >
+            <span className="text-2xl mb-1">
+              {bet.result === 'win' ? '😺' : '😿'}
+            </span>
+            <span className="text-sm text-gray-300">{bet.amount} HYPE</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const Coin = ({ isFlipping, result }: { isFlipping: boolean; result: 'win' | 'lose' | null }) => {
   return (
     <div className="relative w-32 h-32 mb-8 mx-auto">
@@ -39,15 +79,60 @@ export function CoinFlip() {
   const [lastProcessedBet, setLastProcessedBet] = useState<bigint | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [lastResetTime, setLastResetTime] = useState<number>(0);
+  const [betHistory, setBetHistory] = useState<BetHistoryItem[]>([]);
   const [pendingBet, setPendingBet] = useState<{
     hasBet: boolean;
     targetBlock: number;
     currentBlock: number;
   } | null>(null);
 
-  // Handle hydration mismatch
+  // Save bet history to localStorage whenever it changes
+  useEffect(() => {
+    console.log('Bet history changed:', betHistory);
+    localStorage.setItem('betHistory', JSON.stringify(betHistory));
+  }, [betHistory]);
+
+  // Handle hydration mismatch and load bet history
   useEffect(() => {
     setMounted(true);
+    
+    // Load bet history first
+    try {
+      const savedHistory = localStorage.getItem('betHistory');
+      console.log('Loading saved history from localStorage:', savedHistory);
+      
+      if (savedHistory) {
+        const parsedHistory = JSON.parse(savedHistory);
+        console.log('Parsed history:', parsedHistory);
+        
+        if (Array.isArray(parsedHistory)) {
+          console.log('Setting bet history from localStorage:', parsedHistory);
+          setBetHistory(parsedHistory);
+        } else {
+          console.log('Saved history is not an array, initializing empty history');
+          setBetHistory([]);
+        }
+      } else {
+        console.log('No saved history found, initializing empty history');
+        setBetHistory([]);
+      }
+    } catch (error) {
+      console.error('Error loading bet history:', error);
+      setBetHistory([]);
+    }
+    
+    // Reset game state on mount
+    setGameResult(null);
+    setSelectedAmount(0);
+    setIsFlipping(false);
+    setPendingBet(null);
+    setLastProcessedBet(null);
+    setIsResetting(false);
+    setLastResetTime(Math.floor(Date.now() / 1000));
+    
+    // Clear any game state from localStorage
+    localStorage.removeItem('lastProcessedBet');
+    localStorage.removeItem('gameResult');
   }, []);
 
   // Get allowed bet amounts
@@ -101,12 +186,6 @@ export function CoinFlip() {
       }
     }
   }, [betDetails, gameResult, isResetting, pendingBet, lastResetTime]);
-
-  // Contract configuration
-  const CONTRACT_CONFIG = {
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-  } as const;
 
   // Contract writes
   const { writeContract: placeBet, data: placeBetHash } = useWriteContract();
@@ -187,7 +266,8 @@ export function CoinFlip() {
         isResetting,
         hasPendingBet: pendingBet?.hasBet,
         currentTime: Math.floor(Date.now() / 1000),
-        lastResetTime
+        lastResetTime,
+        betHistory
       });
       return;
     }
@@ -201,7 +281,8 @@ export function CoinFlip() {
       playerWon,
       lastProcessedBet: lastProcessedBet?.toString(),
       lastResetTime,
-      currentTime: Math.floor(Date.now() / 1000)
+      currentTime: Math.floor(Date.now() / 1000),
+      currentBetHistory: betHistory
     });
     
     // Only process if this is a new, settled bet after our last reset
@@ -213,8 +294,21 @@ export function CoinFlip() {
       console.log('Setting game result from historical bet:', playerWon ? 'WIN' : 'LOSE');
       setGameResult(playerWon ? 'win' : 'lose');
       setLastProcessedBet(placedAt);
+      
+      // Update bet history here as well
+      const newBet: BetHistoryItem = {
+        result: playerWon ? 'win' : 'lose',
+        amount: Number(amount) / 1e18,
+        timestamp: Date.now()
+      };
+      
+      setBetHistory(prev => {
+        const newHistory = [newBet, ...prev].slice(0, 10);
+        localStorage.setItem('betHistory', JSON.stringify(newHistory));
+        return newHistory;
+      });
     }
-  }, [betDetails, gameResult, pendingBet, lastProcessedBet, isResetting, lastResetTime]);
+  }, [betDetails, gameResult, pendingBet, lastProcessedBet, isResetting, lastResetTime, betHistory]);
 
   // Watch for bet events
   useWatchContractEvent({
@@ -248,14 +342,47 @@ export function CoinFlip() {
         setPendingBet(null);
         setIsFlipping(false);
         
-        // Set game result and update last processed bet
+        // Set game result
         setGameResult(won ? 'win' : 'lose');
         
-        // Update last processed bet if we have the details
-        if (betDetails) {
-          const [, , placedAt] = betDetails;
-          setLastProcessedBet(placedAt);
-        }
+        // Immediately refetch bet details to ensure we have the latest data
+        refetchBetDetails().then(() => {
+          if (betDetails) {
+            const [amount] = betDetails;
+            console.log('Creating new bet history item with amount:', amount.toString());
+            
+            const newBet: BetHistoryItem = {
+              result: won ? 'win' : 'lose',
+              amount: Number(amount) / 1e18,
+              timestamp: Date.now()
+            };
+            console.log('New bet history item:', newBet);
+            
+            setBetHistory(prev => {
+              console.log('Previous bet history:', prev);
+              const newHistory = [newBet, ...prev].slice(0, 10);
+              console.log('New bet history after update:', newHistory);
+              
+              // Save to localStorage
+              try {
+                localStorage.setItem('betHistory', JSON.stringify(newHistory));
+                console.log('Successfully saved bet history to localStorage');
+              } catch (error) {
+                console.error('Error saving bet history to localStorage:', error);
+              }
+              
+              return newHistory;
+            });
+            
+            // Update last processed bet
+            const [, , placedAt] = betDetails;
+            setLastProcessedBet(placedAt);
+          } else {
+            console.warn('betDetails still not available after refetch');
+          }
+        }).catch(error => {
+          console.error('Error refetching bet details:', error);
+        });
       }
     },
   });
@@ -329,7 +456,7 @@ export function CoinFlip() {
     setLastResetTime(currentTime);
     console.log('Setting reset time to:', currentTime);
     
-    // Clear all state immediately
+    // Clear game state but preserve bet history
     setGameResult(null);
     setSelectedAmount(0);
     setIsFlipping(false);
@@ -374,87 +501,90 @@ export function CoinFlip() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
-      <div className="w-full max-w-md p-6 rounded-lg shadow-lg bg-gray-800">
-        <div className="flex justify-end mb-4">
-          <ConnectButton />
-        </div>
+      <div className="w-full max-w-md">
+        <BetHistory history={betHistory} />
+        <div className="p-6 rounded-lg shadow-lg bg-gray-800">
+          <div className="flex justify-end mb-4">
+            <ConnectButton />
+          </div>
 
-        {!isConnected ? (
-          <div className="text-center py-4">
-            <p className="text-xl">Connect your wallet to start playing!</p>
-          </div>
-        ) : gameResult !== null ? (
-          <AnimatePresence>
-            <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              className="text-center py-8"
-            >
-              <Coin isFlipping={false} result={gameResult} />
-              <h2 className="text-6xl font-bold mb-6">
-                {gameResult === 'win' ? '🎉 You Won! 🎉' : '😢 You Lost 😢'}
-              </h2>
-              <button
-                onClick={handlePlayAgain}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors"
-              >
-                Play Again
-              </button>
-            </motion.div>
-          </AnimatePresence>
-        ) : pendingBet?.hasBet ? (
-          <div className="text-center py-4">
-            <h2 className="text-2xl font-bold mb-4">Pending Bet</h2>
-            <Coin isFlipping={true} result={null} />
-            <p className="mb-4">
-              Target Block: {pendingBet.targetBlock}
-              <br />
-              Current Block: {pendingBet.currentBlock}
-            </p>
-            <button
-              onClick={handleSettle}
-              disabled={isSettleBetLoading || isFlipping}
-              className={`bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors ${
-                (isSettleBetLoading || isFlipping) && 'opacity-50 cursor-not-allowed'
-              }`}
-            >
-              {isSettleBetLoading || isFlipping ? 'Revealing...' : 'Reveal Result'}
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-center mb-8">Choose Your Bet</h2>
-            <Coin isFlipping={isFlipping} result={null} />
-            <div className="grid grid-cols-2 gap-4">
-              {allowedBets.map((amount) => (
-                <button
-                  key={amount}
-                  onClick={() => setSelectedAmount(amount)}
-                  className={`p-4 rounded-lg transition-colors ${
-                    selectedAmount === amount
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 hover:bg-gray-600'
-                  }`}
-                >
-                  {amount} HYPE
-                </button>
-              ))}
+          {!isConnected ? (
+            <div className="text-center py-4">
+              <p className="text-xl">Connect your wallet to start playing!</p>
             </div>
-            <div className="text-center">
+          ) : gameResult !== null ? (
+            <AnimatePresence>
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                className="text-center py-8"
+              >
+                <Coin isFlipping={false} result={gameResult} />
+                <h2 className="text-6xl font-bold mb-6">
+                  {gameResult === 'win' ? '🎉 You Won! 🎉' : '😢 You Lost 😢'}
+                </h2>
+                <button
+                  onClick={handlePlayAgain}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors"
+                >
+                  Play Again
+                </button>
+              </motion.div>
+            </AnimatePresence>
+          ) : pendingBet?.hasBet ? (
+            <div className="text-center py-4">
+              <h2 className="text-2xl font-bold mb-4">Pending Bet</h2>
+              <Coin isFlipping={true} result={null} />
+              <p className="mb-4">
+                Target Block: {pendingBet.targetBlock}
+                <br />
+                Current Block: {pendingBet.currentBlock}
+              </p>
               <button
-                onClick={handleBet}
-                disabled={!selectedAmount || isPlaceBetLoading || isFlipping}
-                className={`bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full transition-colors ${
-                  (!selectedAmount || isPlaceBetLoading || isFlipping) &&
-                  'opacity-50 cursor-not-allowed'
+                onClick={handleSettle}
+                disabled={isSettleBetLoading || isFlipping}
+                className={`bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors ${
+                  (isSettleBetLoading || isFlipping) && 'opacity-50 cursor-not-allowed'
                 }`}
               >
-                {isPlaceBetLoading || isFlipping ? 'Flipping...' : 'Flip Coin'}
+                {isSettleBetLoading || isFlipping ? 'Revealing...' : 'Reveal Result'}
               </button>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-center mb-8">Choose Your Bet</h2>
+              <Coin isFlipping={isFlipping} result={null} />
+              <div className="grid grid-cols-2 gap-4">
+                {allowedBets.map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => setSelectedAmount(amount)}
+                    className={`p-4 rounded-lg transition-colors ${
+                      selectedAmount === amount
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                  >
+                    {amount} HYPE
+                  </button>
+                ))}
+              </div>
+              <div className="text-center">
+                <button
+                  onClick={handleBet}
+                  disabled={!selectedAmount || isPlaceBetLoading || isFlipping}
+                  className={`bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full transition-colors ${
+                    (!selectedAmount || isPlaceBetLoading || isFlipping) &&
+                    'opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  {isPlaceBetLoading || isFlipping ? 'Flipping...' : 'Flip Coin'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
