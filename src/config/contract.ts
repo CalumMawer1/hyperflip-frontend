@@ -1,8 +1,10 @@
-export const CONTRACT_ADDRESS = '0xB2A6de6bB7c43184e4b754FF1086b3368EBA943e' as const;
+export const CONTRACT_ADDRESS = '0x06AaE6001FB69dC506B919e693d9B510113BE5A8' as const;
 
 export const CONTRACT_ABI = [
   {
-    "inputs": [],
+    "inputs": [
+      { "internalType": "uint8", "name": "choice", "type": "uint8" }
+    ],
     "name": "placeBet",
     "outputs": [],
     "stateMutability": "payable",

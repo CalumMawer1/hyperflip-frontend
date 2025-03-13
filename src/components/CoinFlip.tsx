@@ -36,7 +36,7 @@ const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
             }`}
           >
             <span className="text-2xl mb-1">
-              {bet.result === 'win' ? '😺' : '😿'}
+              {bet.result === 'win' ? 'H' : 'T'}
             </span>
             <span className="text-sm text-gray-300">{bet.amount} HYPE</span>
           </div>
@@ -46,11 +46,13 @@ const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
   );
 };
 
-const Coin = ({ isFlipping, result }: { isFlipping: boolean; result: 'win' | 'lose' | null }) => {
+const Coin = ({ isFlipping, result, selectedChoice = 0 }: { isFlipping: boolean; result: 'win' | 'lose' | null; selectedChoice?: 0 | 1 }) => {
   return (
     <div className="relative w-32 h-32 mb-8 mx-auto">
       <motion.div
-        className="w-full h-full rounded-full bg-yellow-400 flex items-center justify-center text-4xl shadow-lg"
+        className={`w-full h-full rounded-full flex items-center justify-center text-4xl shadow-lg border-4 border-green-500 ${
+          isFlipping ? 'bg-black' : 'bg-black'
+        }`}
         animate={{
           rotateX: isFlipping ? [0, 720, 1440, 2160, 2880] : 0,
           scale: isFlipping ? [1, 1.2, 1] : 1,
@@ -61,9 +63,52 @@ const Coin = ({ isFlipping, result }: { isFlipping: boolean; result: 'win' | 'lo
           ease: "linear"
         }}
       >
-        {!isFlipping && result === 'win' && "😺"}
-        {!isFlipping && result === 'lose' && "😿"}
-        {(isFlipping || !result) && "🪙"}
+        <div className="flex flex-col items-center justify-center w-full h-full relative">
+          {!isFlipping && result === 'win' && (
+            <span className="text-4xl font-bold text-green-500">H</span>
+          )}
+          {!isFlipping && result === 'lose' && (
+            <span className="text-4xl font-bold text-green-500">T</span>
+          )}
+          {(isFlipping || !result) && (
+            <>
+              {isFlipping ? (
+                <>
+                  <motion.div
+                    className="absolute w-full h-full flex items-center justify-center"
+                    animate={{
+                      opacity: isFlipping ? [1, 0, 1, 0, 1] : 1,
+                    }}
+                    transition={{
+                      duration: isFlipping ? 2 : 0.5,
+                      repeat: isFlipping ? Infinity : 0,
+                      ease: "linear"
+                    }}
+                  >
+                    <span className="text-4xl font-bold text-green-500">H</span>
+                  </motion.div>
+                  <motion.div
+                    className="absolute w-full h-full flex items-center justify-center"
+                    animate={{
+                      opacity: isFlipping ? [0, 1, 0, 1, 0] : 0,
+                    }}
+                    transition={{
+                      duration: isFlipping ? 2 : 0.5,
+                      repeat: isFlipping ? Infinity : 0,
+                      ease: "linear"
+                    }}
+                  >
+                    <span className="text-4xl font-bold text-green-500">T</span>
+                  </motion.div>
+                </>
+              ) : (
+                <span className="text-4xl font-bold text-green-500">
+                  {selectedChoice === 0 ? 'H' : 'T'}
+                </span>
+              )}
+            </>
+          )}
+        </div>
       </motion.div>
     </div>
   );
@@ -73,6 +118,7 @@ export function CoinFlip() {
   const { address, isConnected } = useAccount();
   const [mounted, setMounted] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<number>(0);
+  const [selectedChoice, setSelectedChoice] = useState<0 | 1>(0); // 0 for heads, 1 for tails
   const [isFlipping, setIsFlipping] = useState(false);
   const [gameResult, setGameResult] = useState<'win' | 'lose' | null>(null);
   const [allowedBets, setAllowedBets] = useState<number[]>([]);
@@ -188,7 +234,7 @@ export function CoinFlip() {
   }, [betDetails, gameResult, isResetting, pendingBet, lastResetTime]);
 
   // Contract writes
-  const { writeContract: placeBet, data: placeBetHash } = useWriteContract();
+  const { writeContract, data: placeBetHash } = useWriteContract();
   const { writeContract: settleBet, data: settleBetHash } = useWriteContract();
 
   // Watch transaction status
@@ -407,17 +453,15 @@ export function CoinFlip() {
 
   const handleBet = async () => {
     if (!selectedAmount) return;
-    
     try {
-      setIsFlipping(true);
-      console.log('Placing bet...');
-      await placeBet({
+      const result = await writeContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
         functionName: 'placeBet',
+        args: [selectedChoice],
         value: parseEther(selectedAmount.toString()),
       });
-      console.log('Bet transaction submitted');
+      console.log('Bet transaction submitted', result);
     } catch (error) {
       console.error('Error placing bet:', error);
       setIsFlipping(false);
@@ -483,6 +527,31 @@ export function CoinFlip() {
     }
   };
 
+  const CoinSelector = () => (
+    <div className="flex justify-center space-x-4 mb-6">
+      <button
+        onClick={() => setSelectedChoice(0)}
+        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+          selectedChoice === 0
+            ? 'bg-yellow-500 text-black'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+        }`}
+      >
+        Heads
+      </button>
+      <button
+        onClick={() => setSelectedChoice(1)}
+        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+          selectedChoice === 1
+            ? 'bg-yellow-500 text-black'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+        }`}
+      >
+        Tails
+      </button>
+    </div>
+  );
+
   if (!mounted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
@@ -520,7 +589,7 @@ export function CoinFlip() {
                 exit={{ scale: 0, opacity: 0 }}
                 className="text-center py-8"
               >
-                <Coin isFlipping={false} result={gameResult} />
+                <Coin isFlipping={false} result={gameResult} selectedChoice={selectedChoice} />
                 <h2 className="text-6xl font-bold mb-6">
                   {gameResult === 'win' ? '🎉 You Won! 🎉' : '😢 You Lost 😢'}
                 </h2>
@@ -535,7 +604,7 @@ export function CoinFlip() {
           ) : pendingBet?.hasBet ? (
             <div className="text-center py-4">
               <h2 className="text-2xl font-bold mb-4">Pending Bet</h2>
-              <Coin isFlipping={true} result={null} />
+              <Coin isFlipping={true} result={null} selectedChoice={selectedChoice} />
               <p className="mb-4">
                 Target Block: {pendingBet.targetBlock}
                 <br />
@@ -554,7 +623,8 @@ export function CoinFlip() {
           ) : (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-center mb-8">Choose Your Bet</h2>
-              <Coin isFlipping={isFlipping} result={null} />
+              <Coin isFlipping={isFlipping} result={null} selectedChoice={selectedChoice} />
+              <CoinSelector />
               <div className="grid grid-cols-2 gap-4">
                 {allowedBets.map((amount) => (
                   <button
