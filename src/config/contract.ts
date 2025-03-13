@@ -18,6 +18,29 @@ export const CONTRACT_ABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      { "internalType": "uint8", "name": "choice", "type": "uint8" }
+    ],
+    "name": "placeFreeBet",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "player", "type": "address" }],
+    "name": "isWhitelistedForFreeBet",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "player", "type": "address" }],
+    "name": "hasUsedFreeBet",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "getAllowedBetAmounts",
     "outputs": [{ "internalType": "uint256[]", "name": "", "type": "uint256[]" }],

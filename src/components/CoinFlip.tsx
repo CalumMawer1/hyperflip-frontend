@@ -5,11 +5,13 @@ import { useAccount, useContractRead, useWatchContractEvent } from 'wagmi';
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../config/contract';
+import Confetti from 'react-confetti';
 
 type BetHistoryItem = {
   result: 'win' | 'lose';
   amount: number;
   timestamp: number;
+  isFree?: boolean;
 };
 
 const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
@@ -24,21 +26,34 @@ const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
     );
   }
 
+  // Function to normalize bet amounts to exact UI button amounts
+  const normalizeAmount = (amount: number): number => {
+    // Map contract amounts to exact UI button amounts
+    if (amount >= 0.24 && amount < 0.26) return 0.25;
+    if (amount >= 0.48 && amount < 0.52) return 0.5;
+    if (amount >= 0.97 && amount < 1.03) return 1;
+    if (amount >= 1.94 && amount < 2.06) return 2;
+    return Math.round(amount); // Round to nearest whole number
+  };
+
   return (
     <div className="w-full bg-gray-800 p-4 rounded-lg mb-6 overflow-x-auto">
       <h3 className="text-lg font-semibold mb-3 text-center">Recent Flips</h3>
-      <div className="flex justify-center space-x-2">
+      <div className="flex justify-center space-x-2 overflow-x-auto pb-2">
         {history.map((bet, index) => (
           <div
             key={index}
-            className={`flex flex-col items-center p-2 rounded-lg min-w-[80px] ${
+            className={`flex flex-col items-center p-3 rounded-lg min-w-[90px] ${
               bet.result === 'win' ? 'bg-green-600/20' : 'bg-red-600/20'
             }`}
           >
             <span className="text-2xl mb-1">
               {bet.result === 'win' ? 'H' : 'T'}
             </span>
-            <span className="text-sm text-gray-300">{bet.amount} HYPE</span>
+            <span className="text-sm text-gray-300">
+              {normalizeAmount(bet.amount)} HYPE
+              {bet.isFree && <span className="text-xs block text-green-400">(Free)</span>}
+            </span>
           </div>
         ))}
       </div>
@@ -131,6 +146,15 @@ export function CoinFlip() {
     targetBlock: number;
     currentBlock: number;
   } | null>(null);
+  const [isEligibleForFreeBet, setIsEligibleForFreeBet] = useState<boolean>(false);
+  const [hasUsedFreeBet, setHasUsedFreeBet] = useState<boolean>(false);
+  const [originalBetAmounts, setOriginalBetAmounts] = useState<Record<string, number>>({});
+  const [currentBetAmount, setCurrentBetAmount] = useState<number | null>(null);
+  const [pendingBetAmount, setPendingBetAmount] = useState<number | null>(null);
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0,
+  });
 
   // Save bet history to localStorage whenever it changes
   useEffect(() => {
@@ -233,6 +257,52 @@ export function CoinFlip() {
     }
   }, [betDetails, gameResult, isResetting, pendingBet, lastResetTime]);
 
+  // Check if user is eligible for a free bet
+  const { data: freeBetEligibility, refetch: refetchFreeBetEligibility } = useContractRead({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'isWhitelistedForFreeBet',
+    args: address ? [address] : undefined,
+  });
+
+  // Check if user has already used their free bet
+  const { data: usedFreeBet, refetch: refetchUsedFreeBet } = useContractRead({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'hasUsedFreeBet',
+    args: address ? [address] : undefined,
+  });
+
+  // Update eligibility state when data changes
+  useEffect(() => {
+    console.log('Free bet whitelist check:', { address, freeBetEligibility });
+    console.log('Has used free bet check:', { address, usedFreeBet });
+    
+    if (freeBetEligibility !== undefined) {
+      setIsEligibleForFreeBet(!!freeBetEligibility);
+    }
+    
+    if (usedFreeBet !== undefined) {
+      setHasUsedFreeBet(!!usedFreeBet);
+    }
+  }, [freeBetEligibility, usedFreeBet, address]);
+
+  // Refetch free bet eligibility and usage periodically
+  useEffect(() => {
+    if (isConnected && address) {
+      // Initial check
+      refetchFreeBetEligibility();
+      refetchUsedFreeBet();
+      
+      const interval = setInterval(() => {
+        refetchFreeBetEligibility();
+        refetchUsedFreeBet();
+      }, 10000); // Check every 10 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [isConnected, address, refetchFreeBetEligibility, refetchUsedFreeBet]);
+
   // Contract writes
   const { writeContract, data: placeBetHash } = useWriteContract();
   const { writeContract: settleBet, data: settleBetHash } = useWriteContract();
@@ -269,7 +339,9 @@ export function CoinFlip() {
   // Update allowed bets when contract data changes
   useEffect(() => {
     if (allowedBetAmounts) {
-      setAllowedBets(allowedBetAmounts.map(n => Number(n) / 1e18));
+      // Convert bigint array to number array
+      const amounts = Array.from(allowedBetAmounts).map(n => BigInt(n));
+      setAllowedBets(amounts as unknown as number[]);
     }
   }, [allowedBetAmounts]);
 
@@ -365,6 +437,16 @@ export function CoinFlip() {
       const [log] = logs;
       if (log && log.args.player === address) {
         console.log('Bet placed event received:', log.args);
+        
+        // Store the original bet amount for later use in history
+        const betAmount = Number(log.args.amount) / 1e18;
+        const blockNumber = Number(log.args.blockNumber);
+        
+        setOriginalBetAmounts(prev => ({
+          ...prev,
+          [blockNumber.toString()]: betAmount
+        }));
+        
         setIsFlipping(false);
         setSelectedAmount(0);
         refetchPendingBet();
@@ -391,44 +473,53 @@ export function CoinFlip() {
         // Set game result
         setGameResult(won ? 'win' : 'lose');
         
-        // Immediately refetch bet details to ensure we have the latest data
-        refetchBetDetails().then(() => {
-          if (betDetails) {
-            const [amount] = betDetails;
-            console.log('Creating new bet history item with amount:', amount.toString());
-            
-            const newBet: BetHistoryItem = {
-              result: won ? 'win' : 'lose',
-              amount: Number(amount) / 1e18,
-              timestamp: Date.now()
-            };
-            console.log('New bet history item:', newBet);
-            
-            setBetHistory(prev => {
-              console.log('Previous bet history:', prev);
-              const newHistory = [newBet, ...prev].slice(0, 10);
-              console.log('New bet history after update:', newHistory);
-              
-              // Save to localStorage
-              try {
-                localStorage.setItem('betHistory', JSON.stringify(newHistory));
-                console.log('Successfully saved bet history to localStorage');
-              } catch (error) {
-                console.error('Error saving bet history to localStorage:', error);
-              }
-              
-              return newHistory;
-            });
-            
-            // Update last processed bet
-            const [, , placedAt] = betDetails;
-            setLastProcessedBet(placedAt);
-          } else {
-            console.warn('betDetails still not available after refetch');
+        // Get the contract amount for reference
+        const contractAmount = Number(log.args.amount) / 1e18;
+        console.log('Contract amount from event:', contractAmount);
+        
+        // ALWAYS use the exact UI button amounts
+        let displayAmount: number;
+        let isFree = false;
+        
+        // Determine which button amount this corresponds to
+        if (contractAmount >= 0.24 && contractAmount < 0.26) {
+          displayAmount = 0.25;
+          // Free bet detection
+          isFree = contractAmount < 0.25;
+        }
+        else if (contractAmount >= 0.48 && contractAmount < 0.52) displayAmount = 0.5;
+        else if (contractAmount >= 0.97 && contractAmount < 1.03) displayAmount = 1;
+        else if (contractAmount >= 1.94 && contractAmount < 2.06) displayAmount = 2;
+        else displayAmount = Math.round(contractAmount); // Round to nearest whole number
+        
+        console.log('Using exact UI button amount for history:', displayAmount);
+        
+        const newBet: BetHistoryItem = {
+          result: won ? 'win' : 'lose',
+          amount: displayAmount,
+          timestamp: Date.now(),
+          isFree: isFree
+        };
+        
+        setBetHistory(prev => {
+          console.log('Previous bet history:', prev);
+          const newHistory = [newBet, ...prev].slice(0, 10);
+          console.log('New bet history after update:', newHistory);
+          
+          // Save to localStorage
+          try {
+            localStorage.setItem('betHistory', JSON.stringify(newHistory));
+            console.log('Successfully saved bet history to localStorage');
+          } catch (error) {
+            console.error('Error saving bet history to localStorage:', error);
           }
-        }).catch(error => {
-          console.error('Error refetching bet details:', error);
+          
+          return newHistory;
         });
+        
+        // Reset state
+        setCurrentBetAmount(null);
+        setPendingBetAmount(null);
       }
     },
   });
@@ -451,9 +542,38 @@ export function CoinFlip() {
     },
   });
 
+  // After a free bet is placed, refetch the usage status
+  useEffect(() => {
+    if (isPlaceBetSuccess) {
+      refetchUsedFreeBet();
+    }
+  }, [isPlaceBetSuccess, refetchUsedFreeBet]);
+
+  // Update window size on resize
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleBet = async () => {
     if (!selectedAmount) return;
     try {
+      setIsFlipping(true);
+      console.log('Placing bet with amount:', selectedAmount);
+      
+      // Store the exact amount the user selected
+      setPendingBetAmount(selectedAmount);
+      console.log('Stored pending bet amount:', selectedAmount);
+      
       const result = await writeContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
@@ -462,9 +582,14 @@ export function CoinFlip() {
         value: parseEther(selectedAmount.toString()),
       });
       console.log('Bet transaction submitted', result);
+      
+      // Refetch pending bet status
+      refetchPendingBet();
     } catch (error) {
       console.error('Error placing bet:', error);
       setIsFlipping(false);
+      // Clear pending bet amount on error
+      setPendingBetAmount(null);
     }
   };
 
@@ -506,6 +631,8 @@ export function CoinFlip() {
     setIsFlipping(false);
     setPendingBet(null);
     setLastProcessedBet(null);
+    setCurrentBetAmount(null);
+    setPendingBetAmount(null);
     
     try {
       // Force refetch of all contract state
@@ -524,6 +651,36 @@ export function CoinFlip() {
       console.error('Error resetting game state:', error);
       // Clear resetting flag even on error
       setIsResetting(false);
+    }
+  };
+
+  const handleFreeBet = async () => {
+    try {
+      setIsFlipping(true);
+      console.log('Placing free bet...');
+      
+      // Store the free bet amount (always 0.25)
+      setPendingBetAmount(0.25);
+      console.log('Stored pending free bet amount: 0.25');
+      
+      const result = await writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'placeFreeBet',
+        args: [selectedChoice],
+      });
+      console.log('Free bet transaction submitted', result);
+      
+      // Immediately refetch to update the UI
+      refetchUsedFreeBet();
+      
+      // Also refetch pending bet status
+      refetchPendingBet();
+    } catch (error) {
+      console.error('Error placing free bet:', error);
+      setIsFlipping(false);
+      // Clear pending bet amount on error
+      setPendingBetAmount(null);
     }
   };
 
@@ -552,6 +709,31 @@ export function CoinFlip() {
     </div>
   );
 
+  // Add this component for the free bet banner
+  const FreeBetBanner = () => {
+    console.log('Rendering FreeBetBanner, isEligibleForFreeBet:', isEligibleForFreeBet, 'hasUsedFreeBet:', hasUsedFreeBet);
+    
+    if (!isEligibleForFreeBet || hasUsedFreeBet) return null;
+    
+    return (
+      <div className="bg-green-600 text-white p-4 rounded-lg mb-6 text-center animate-pulse w-full">
+        <p className="font-bold text-lg">🎉 You're eligible for a free bet! 🎉</p>
+        <p className="text-sm mt-1">Click the green button below to use your free 0.25 HYPE bet</p>
+      </div>
+    );
+  };
+
+  // Update confetti settings for a more exciting effect
+  const confettiConfig = {
+    width: windowSize.width,
+    height: windowSize.height,
+    recycle: false,
+    numberOfPieces: 800,
+    gravity: 0.3,
+    colors: ['#FFD700', '#FFA500', '#FF4500', '#9370DB', '#00BFFF', '#32CD32'],
+    tweenDuration: 5000
+  };
+
   if (!mounted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
@@ -570,8 +752,20 @@ export function CoinFlip() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
-      <div className="w-full max-w-md">
+      {gameResult === 'win' && (
+        <Confetti
+          width={confettiConfig.width}
+          height={confettiConfig.height}
+          recycle={confettiConfig.recycle}
+          numberOfPieces={confettiConfig.numberOfPieces}
+          gravity={confettiConfig.gravity}
+          colors={confettiConfig.colors}
+          tweenDuration={confettiConfig.tweenDuration}
+        />
+      )}
+      <div className="w-full max-w-xl">
         <BetHistory history={betHistory} />
+        
         <div className="p-6 rounded-lg shadow-lg bg-gray-800">
           <div className="flex justify-end mb-4">
             <ConnectButton />
@@ -590,14 +784,14 @@ export function CoinFlip() {
                 className="text-center py-8"
               >
                 <Coin isFlipping={false} result={gameResult} selectedChoice={selectedChoice} />
-                <h2 className="text-6xl font-bold mb-6">
-                  {gameResult === 'win' ? '🎉 You Won! 🎉' : '😢 You Lost 😢'}
+                <h2 className="text-5xl font-bold mb-6 whitespace-nowrap">
+                  {gameResult === 'win' ? '😻 You Won! 😻' : '😿 You Lost 😿'}
                 </h2>
                 <button
                   onClick={handlePlayAgain}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors"
                 >
-                  Play Again
+                  {gameResult === 'win' ? 'Double or Nothing?' : 'Run it back?'}
                 </button>
               </motion.div>
             </AnimatePresence>
@@ -622,36 +816,50 @@ export function CoinFlip() {
             </div>
           ) : (
             <div className="space-y-6">
+              <FreeBetBanner />
               <h2 className="text-2xl font-bold text-center mb-8">Choose Your Bet</h2>
               <Coin isFlipping={isFlipping} result={null} selectedChoice={selectedChoice} />
               <CoinSelector />
+              
+              {/* Bet amount buttons */}
               <div className="grid grid-cols-2 gap-4">
                 {allowedBets.map((amount) => (
                   <button
                     key={amount}
-                    onClick={() => setSelectedAmount(amount)}
-                    className={`p-4 rounded-lg transition-colors ${
-                      selectedAmount === amount
+                    onClick={() => setSelectedAmount(Number(amount) / 1e18)}
+                    className={`py-3 px-4 rounded-lg font-semibold transition-all ${
+                      selectedAmount === Number(amount) / 1e18
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 hover:bg-gray-600'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                     }`}
                   >
-                    {amount} HYPE
+                    {(Number(amount) / 1e18).toString()} HYPE
                   </button>
                 ))}
               </div>
-              <div className="text-center">
+              
+              {/* Free bet button */}
+              {isEligibleForFreeBet && !hasUsedFreeBet && (
                 <button
-                  onClick={handleBet}
-                  disabled={!selectedAmount || isPlaceBetLoading || isFlipping}
-                  className={`bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full transition-colors ${
-                    (!selectedAmount || isPlaceBetLoading || isFlipping) &&
-                    'opacity-50 cursor-not-allowed'
-                  }`}
+                  onClick={handleFreeBet}
+                  className="w-full py-3 px-4 rounded-lg font-semibold bg-green-600 hover:bg-green-700 text-white transition-all"
                 >
-                  {isPlaceBetLoading || isFlipping ? 'Flipping...' : 'Flip Coin'}
+                  Free 0.25 HYPE
                 </button>
-              </div>
+              )}
+              
+              {/* Place bet button */}
+              <button
+                onClick={handleBet}
+                disabled={!selectedAmount || isPlaceBetLoading || isFlipping}
+                className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${
+                  !selectedAmount || isPlaceBetLoading || isFlipping
+                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                {isPlaceBetLoading || isFlipping ? 'Placing Bet...' : 'Place Bet'}
+              </button>
             </div>
           )}
         </div>
