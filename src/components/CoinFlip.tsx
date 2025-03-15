@@ -1,4 +1,4 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+﻿import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useAccount, useContractRead, useWatchContractEvent } from 'wagmi';
@@ -106,7 +106,6 @@ type BetHistoryItem = {
 const CatCoinSVG = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg viewBox="0 0 200 200" className={className}>
     {/* Coin background */}
-    <circle cx="100" cy="100" r="98" fill="#000000" />
     <circle cx="100" cy="100" r="95" fill="#000000" />
     
     {/* H letter */}
@@ -129,7 +128,6 @@ const CatCoinSVG = ({ className = "w-6 h-6" }: { className?: string }) => (
 const TailCoinSVG = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg viewBox="0 0 200 200" className={className}>
     {/* Coin background */}
-    <circle cx="100" cy="100" r="98" fill="#000000" />
     <circle cx="100" cy="100" r="95" fill="#000000" />
     
     {/* T letter */}
@@ -154,7 +152,7 @@ const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
   if (!history || history.length === 0) {
     return (
       <div className="w-full bg-black/80 border border-[#04e6e0]/20 p-4 rounded-lg mb-6 text-center">
-        <h3 className="text-lg font-semibold mb-2">Recent Flips</h3>
+        <h3 className="text-lg font-semibold mb-2 text-[#04e6e0]">Recent Flips</h3>
         <p className="text-gray-400">No bets yet. Make your first bet!</p>
       </div>
     );
@@ -172,32 +170,23 @@ const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
 
   return (
     <div className="w-full bg-black border border-[#04e6e0]/20 p-4 rounded-lg mb-6">
-      <h3 className="text-lg font-semibold mb-3 text-center">Recent Flips</h3>
-      <div className="flex justify-start space-x-2 overflow-x-auto pb-2 px-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+      <h3 className="text-lg font-semibold mb-3 text-center text-[#04e6e0]">Recent Flips</h3>
+      <div className="flex justify-start space-x-2 overflow-x-auto pb-2 px-2 scrollbar-thin scrollbar-thumb-[#04e6e0]/30 scrollbar-track-transparent">
         {history.map((bet, index) => {
-          // Always show the user's selected choice
-          const isHeads = bet.choice === false;
-          
           return (
             <div
               key={index}
               className={`flex flex-col items-center p-3 rounded-lg min-w-[90px] ${
-                bet.result === 'win' ? 'bg-[#04e6e0]/10 border border-[#04e6e0]/30' : 'bg-red-600/20'
+                bet.result === 'win' ? 'bg-[#04e6e0]/10 border border-[#04e6e0]/30' : 'bg-red-600/20 border border-red-600/30'
               } ${index === 0 ? 'ml-1' : ''} ${index === history.length - 1 ? 'mr-1' : ''}`}
             >
               <div className="mb-2 h-8 flex items-center justify-center">
-                {isHeads ? (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                    <CatCoinSVG className="w-8 h-8" />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                    <TailCoinSVG className="w-8 h-8" />
-                  </div>
-                )}
+                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                  {bet.choice ? <TailCoinSVG className="w-8 h-8" /> : <CatCoinSVG className="w-8 h-8" />}
+                </div>
               </div>
               <div className="flex flex-col items-center justify-center text-center">
-                <span className="text-sm font-medium text-gray-300">
+                <span className="text-sm font-medium text-[#04e6e0]">
                   {normalizeAmount(bet.amount)} HYPE
                 </span>
                 {bet.isFree && <span className="text-xs block text-green-400">(Free)</span>}
@@ -214,9 +203,8 @@ const Coin = ({ isFlipping, result, selectedChoice = 0 }: { isFlipping: boolean;
   // Convert numeric choice to boolean to match contract (0 = heads/false, 1 = tails/true)
   const choiceAsBool = selectedChoice === 1;
   
-  // Determine border and text color based on result
-  const borderColor = result === 'lose' ? 'border-red-600' : 'border-[#04e6e0]';
-  const textColor = result === 'lose' ? 'text-red-600' : 'text-[#04e6e0]';
+  // Only show red border for losses, use theme color for everything else (including null result and wins)
+  const borderColorClass = result === 'lose' ? 'border-red-600' : 'border-[#04e6e0]';
   
   // Cat coin for heads
   const CatCoin = () => (
@@ -237,9 +225,9 @@ const Coin = ({ isFlipping, result, selectedChoice = 0 }: { isFlipping: boolean;
   );
   
   return (
-    <div className="relative w-32 h-32 mb-8 mx-auto">
+    <div className="relative w-32 h-32 mb-2 mx-auto">
       <motion.div
-        className={`w-full h-full rounded-full flex items-center justify-center text-4xl shadow-lg border-4 ${borderColor} bg-black`}
+        className={`w-full h-full rounded-full flex items-center justify-center text-4xl shadow-lg border-4 ${borderColorClass} bg-black`}
         animate={{
           rotateX: isFlipping ? [0, 720, 1440, 2160, 2880] : 0,
           scale: isFlipping ? [1, 1.2, 1] : 1,
@@ -304,6 +292,27 @@ const Coin = ({ isFlipping, result, selectedChoice = 0 }: { isFlipping: boolean;
     </div>
   );
 };
+
+interface CoinSelectorProps {
+  isSelected: boolean;
+  onClick: () => void;
+  disabled: boolean;
+  children: React.ReactNode;
+}
+
+const CoinSelector = ({ isSelected, onClick, disabled, children }: CoinSelectorProps) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`px-6 py-3 rounded-lg font-semibold transition-all text-white ${
+      isSelected
+        ? 'bg-[#04e6e0] text-black'
+        : 'bg-[#04e6e0]/10 hover:bg-[#04e6e0]/20 text-white'
+    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+  >
+    {children}
+  </button>
+);
 
 export function CoinFlip() {
   const { address, isConnected } = useAccount();
@@ -718,6 +727,9 @@ export function CoinFlip() {
         const choiceAsBool = lastPlacedChoice !== null ? lastPlacedChoice : selectedChoice === 1;
         console.log('Using choice for bet history:', { selectedChoice, lastPlacedChoice, choiceAsBool });
         
+        // Store the display amount for the win message
+        setPendingBetAmount(displayAmount);
+        
         // Create bet history item
         const newBet: BetHistoryItem = {
           result: won ? 'win' : 'lose',
@@ -937,31 +949,6 @@ export function CoinFlip() {
     }
   };
 
-  const CoinSelector = () => (
-    <div className="flex justify-center space-x-4 mb-6">
-      <button
-        onClick={() => setSelectedChoice(0)}
-        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-          selectedChoice === 0
-            ? 'bg-[#04e6e0] text-black'
-            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-        }`}
-      >
-        Heads
-      </button>
-      <button
-        onClick={() => setSelectedChoice(1)}
-        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-          selectedChoice === 1
-            ? 'bg-[#04e6e0] text-black'
-            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-        }`}
-      >
-        Tails
-      </button>
-    </div>
-  );
-
   // Add this component for the free bet banner
   const FreeBetBanner = () => {
     console.log('Rendering FreeBetBanner, isEligibleForFreeBet:', isEligibleForFreeBet, 'hasUsedFreeBet:', hasUsedFreeBet);
@@ -970,7 +957,7 @@ export function CoinFlip() {
     
     return (
       <div className="bg-green-600 text-white p-4 rounded-lg mb-6 text-center animate-pulse w-full">
-        <p className="font-bold text-lg">🎉 You're eligible for a free bet! 🎉</p>
+        <p className="font-bold text-lg">ðŸŽ‰ You're eligible for a free bet! ðŸŽ‰</p>
         <p className="text-sm mt-1">Click the green button below to use your free 0.25 HYPE bet</p>
       </div>
     );
@@ -1009,125 +996,152 @@ export function CoinFlip() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-white p-4 relative">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background */}
       <div className="futuristic-background">
         <div className="grid-lines"></div>
         <div className="glow-circle"></div>
         <div className="glow-circle"></div>
       </div>
-      
-      {gameResult === 'win' && (
-        <Confetti
-          width={confettiConfig.width}
-          height={confettiConfig.height}
-          recycle={confettiConfig.recycle}
-          numberOfPieces={confettiConfig.numberOfPieces}
-          gravity={confettiConfig.gravity}
-          colors={confettiConfig.colors}
-          tweenDuration={confettiConfig.tweenDuration}
-        />
-      )}
-      <div className="w-full max-w-xl">
-        <BetHistory history={betHistory} />
-        
-        <div className="p-6 rounded-lg shadow-lg bg-black border border-[#04e6e0]/20">
-          <div className="flex justify-end mb-4">
-            <ConnectButton />
-          </div>
 
-          {!isConnected ? (
-            <div className="text-center py-4">
-              <p className="text-xl">Connect your wallet to start playing!</p>
-            </div>
-          ) : gameResult !== null ? (
-            <AnimatePresence>
-              <motion.div
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                className="text-center py-8"
-              >
-                <Coin isFlipping={false} result={gameResult} selectedChoice={selectedChoice} />
-                <h2 className="text-5xl font-bold mb-6 whitespace-nowrap">
-                  {gameResult === 'win' ? '😻 You Won! 😻' : '😿 You Lost 😿'}
+      {/* Logo */}
+      <div className="absolute top-6 left-6 z-10">
+        <h1 className="logo-text text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#04e6e0] to-[#03a8a3] drop-shadow-[0_0_10px_rgba(4,230,224,0.3)]">
+          HyperFlip
+        </h1>
+      </div>
+
+      {/* Wallet Connect */}
+      <div className="absolute top-6 right-6 z-10">
+        <ConnectButton />
+      </div>
+
+      {/* Main Content */}
+      <div className="flex flex-col items-center justify-center min-h-screen max-w-2xl mx-auto px-4 pt-24 pb-8">
+        {/* Show confetti on win */}
+        {gameResult === 'win' && <Confetti {...confettiConfig} />}
+
+        {/* Bet History - Always visible */}
+        <div className="w-full">
+          <BetHistory history={betHistory} />
+        </div>
+
+        {gameResult ? (
+          // Win/Loss Screen
+          <div className="w-full bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg text-center">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="relative w-48 h-48">
+                <Coin isFlipping={isFlipping} result={gameResult} selectedChoice={selectedChoice} />
+              </div>
+              <div className="space-y-4">
+                <h2 className={`text-3xl font-bold ${gameResult === 'win' ? 'text-[#04e6e0]' : 'text-red-500'}`}>
+                  {gameResult === 'win' ? `You Won ${pendingBetAmount} HYPE!` : 'You Lost'}
                 </h2>
                 <button
                   onClick={handlePlayAgain}
-                  className="bg-[#04e6e0] hover:bg-[#04e6e0]/80 text-black font-bold py-2 px-4 rounded-full transition-colors"
+                  className="px-8 py-3 bg-[#04e6e0] text-black rounded-lg font-bold hover:bg-[#04e6e0]/80 transition-all"
                 >
-                  {gameResult === 'win' ? 'Double or Nothing?' : 'Run it back?'}
+                  {gameResult === 'win' ? 'Keep Flipping!' : 'Double or Nothing?'}
                 </button>
-              </motion.div>
-            </AnimatePresence>
-          ) : pendingBet?.hasBet ? (
-            <div className="text-center py-4">
-              <h2 className="text-2xl font-bold mb-4">Pending Bet</h2>
-              <Coin isFlipping={true} result={null} selectedChoice={selectedChoice} />
-              <p className="mb-4">
-                Target Block: {pendingBet.targetBlock}
-                <br />
-                Current Block: {pendingBet.currentBlock}
-              </p>
-              <button
-                onClick={handleSettle}
-                disabled={isSettleBetLoading || isFlipping}
-                className={`bg-[#04e6e0] hover:bg-[#04e6e0]/80 text-black font-bold py-2 px-4 rounded-full transition-colors ${
-                  (isSettleBetLoading || isFlipping) && 'opacity-50 cursor-not-allowed'
-                }`}
-              >
-                {isSettleBetLoading || isFlipping ? 'Revealing...' : 'Reveal Result'}
-              </button>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-6">
-              <FreeBetBanner />
-              <h2 className="text-2xl font-bold text-center mb-8">Choose Your Bet</h2>
-              <Coin isFlipping={isFlipping} result={null} selectedChoice={selectedChoice} />
-              <CoinSelector />
-              
-              {/* Bet amount buttons */}
-              <div className="grid grid-cols-2 gap-4">
+          </div>
+        ) : pendingBet?.hasBet ? (
+          // Reveal Results Page
+          <div className="w-full bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg text-center">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="relative w-48 h-48">
+                <Coin isFlipping={isFlipping} result={gameResult} selectedChoice={selectedChoice} />
+              </div>
+              <div className="space-y-4">
+                <div className="text-gray-300 space-y-2">
+                  <p>Current Block: {pendingBet?.currentBlock}</p>
+                  <p>Target Block: {pendingBet?.targetBlock}</p>
+                  <p className="text-sm text-gray-400">
+                    {pendingBet?.currentBlock && pendingBet?.targetBlock && pendingBet.currentBlock < pendingBet.targetBlock
+                      ? `Waiting for ${pendingBet.targetBlock - pendingBet.currentBlock} more blocks...`
+                      : 'Ready to reveal!'}
+                  </p>
+                </div>
+                <button
+                  onClick={handleSettle}
+                  disabled={isFlipping || (!!pendingBet?.currentBlock && !!pendingBet?.targetBlock && pendingBet.currentBlock < pendingBet.targetBlock)}
+                  className={`px-8 py-3 rounded-lg font-bold transition-all ${
+                    isFlipping || (!!pendingBet?.currentBlock && !!pendingBet?.targetBlock && pendingBet.currentBlock < pendingBet.targetBlock)
+                      ? 'bg-gray-600 cursor-not-allowed'
+                      : 'bg-[#04e6e0] hover:bg-[#04e6e0]/80 text-black'
+                  }`}
+                >
+                  {isFlipping ? 'Revealing...' : 'Reveal Results'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          // Betting Interface
+          <div className="w-full bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg">
+            <div className="flex flex-col items-center space-y-1">
+              {/* Coin Display */}
+              <div className="relative w-48 h-48">
+                <Coin isFlipping={isFlipping} result={gameResult} selectedChoice={selectedChoice} />
+              </div>
+
+              {/* Choice Selection */}
+              <div className="flex justify-center gap-3 w-full max-w-xs">
+                <CoinSelector
+                  isSelected={selectedChoice === 0}
+                  onClick={() => setSelectedChoice(0)}
+                  disabled={isFlipping || !isConnected}
+                >
+                  Heads
+                </CoinSelector>
+                <CoinSelector
+                  isSelected={selectedChoice === 1}
+                  onClick={() => setSelectedChoice(1)}
+                  disabled={isFlipping || !isConnected}
+                >
+                  Tails
+                </CoinSelector>
+              </div>
+
+              {/* Bet Amount Selection */}
+              <div className="mt-4 grid grid-cols-2 gap-2 w-full max-w-xs">
                 {allowedBets.map((amount) => (
                   <button
                     key={amount}
                     onClick={() => setSelectedAmount(Number(amount) / 1e18)}
-                    className={`py-3 px-4 rounded-lg font-semibold transition-all ${
+                    className={`px-4 py-2 rounded-lg transition-all text-white ${
                       selectedAmount === Number(amount) / 1e18
-                        ? 'bg-[#04e6e0] text-black'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
+                        ? 'bg-[#04e6e0] text-black font-bold'
+                        : 'bg-[#04e6e0]/10 hover:bg-[#04e6e0]/20 text-white'
+                    } ${isFlipping || !isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isFlipping || !isConnected}
                   >
-                    {(Number(amount) / 1e18).toString()} HYPE
+                    {Number(amount) / 1e18} HYPE
                   </button>
                 ))}
               </div>
-              
-              {/* Free bet button */}
-              {isEligibleForFreeBet && !hasUsedFreeBet && (
-                <button
-                  onClick={handleFreeBet}
-                  className="w-full py-3 px-4 rounded-lg font-semibold bg-green-600 hover:bg-green-700 text-white transition-all"
-                >
-                  Free 0.25 HYPE
-                </button>
-              )}
-              
-              {/* Place bet button */}
+
+              {/* Place Bet Button */}
               <button
                 onClick={handleBet}
-                disabled={!selectedAmount || isPlaceBetLoading || isFlipping}
-                className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${
-                  !selectedAmount || isPlaceBetLoading || isFlipping
-                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                disabled={isFlipping || !isConnected || !selectedAmount}
+                className={`w-full max-w-xs mt-4 py-3 px-6 rounded-lg text-lg font-bold transition-all ${
+                  isFlipping || !isConnected || !selectedAmount
+                    ? 'bg-gray-600 cursor-not-allowed'
                     : 'bg-[#04e6e0] hover:bg-[#04e6e0]/80 text-black'
                 }`}
               >
-                {isPlaceBetLoading || isFlipping ? 'Placing Bet...' : 'Place Bet'}
+                {isFlipping ? 'Flipping...' : 'Place Bet'}
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
+      <style jsx global>
+        {backgroundStyles}
+      </style>
     </div>
   );
 }
