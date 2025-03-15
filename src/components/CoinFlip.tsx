@@ -182,9 +182,9 @@ const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
               } ${index === 0 ? 'ml-1' : ''} ${index === history.length - 1 ? 'mr-1' : ''}`}
             >
               <div className="mb-2 h-8 flex items-center justify-center">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                   {bet.choice ? <TailCoinSVG className="w-8 h-8" /> : <CatCoinSVG className="w-8 h-8" />}
-                </div>
+                  </div>
               </div>
               <div className="flex flex-col items-center justify-center text-center">
                 <span className="text-sm font-medium text-[#04e6e0]">
@@ -323,7 +323,7 @@ export function CoinFlip() {
   const [isFlipping, setIsFlipping] = useState(false);
   const [gameResult, setGameResult] = useState<'win' | 'lose' | null>(null);
   const [allowedBets, setAllowedBets] = useState<number[]>([]);
-  const [lastProcessedBet, setLastProcessedBet] = useState<bigint | null>(null);
+  const [lastProcessedBet, setLastProcessedBet] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [lastResetTime, setLastResetTime] = useState<number>(0);
   const [betHistory, setBetHistory] = useState<BetHistoryItem[]>([]);
@@ -342,6 +342,7 @@ export function CoinFlip() {
     width: typeof window !== 'undefined' ? window.innerWidth : 0,
     height: typeof window !== 'undefined' ? window.innerHeight : 0,
   });
+  const [showFreeBetModal, setShowFreeBetModal] = useState<boolean>(true);
 
   // Add the background styles to the document
   useEffect(() => {
@@ -369,9 +370,55 @@ export function CoinFlip() {
   useEffect(() => {
     setMounted(true);
     
-    // Only load history if we have an address
+    // Check if we need to force a reset (coming from profile page)
+    if (typeof window !== 'undefined') {
+      const forceReset = sessionStorage.getItem('force_reset') === 'true';
+      
+      if (forceReset) {
+        console.log('Force reset detected, resetting game state completely');
+        
+        // CRITICAL: Reset ALL game state variables to initial values
+        setGameResult(null);
+        setSelectedAmount(0);
+        setIsFlipping(false);
+        setPendingBet(null);
+        setPendingBetAmount(null);
+        setCurrentBetAmount(null);
+        setLastProcessedBet(null);
+        setIsResetting(false);
+        setLastResetTime(Math.floor(Date.now() / 1000));
+        
+        // Clear ALL game state from localStorage
+        localStorage.removeItem('gameState');
+        localStorage.removeItem('gameResult');
+        localStorage.removeItem('lastProcessedBet');
+        localStorage.removeItem('pendingBetAmount');
+        localStorage.removeItem('currentBetAmount');
+        
+        // Clear the reset flags
+        sessionStorage.removeItem('force_reset');
+        sessionStorage.removeItem('reset_timestamp');
+        
+        console.log('Game state completely reset');
+      }
+      
+      // IMPORTANT: We're skipping loading stored game state to ensure a fresh start
+      // This prevents the "You won X HYPE" screen from appearing on initial load
+      
+      // Initialize leaderboard data structure if none exists
+      const LEADERBOARD_STORAGE_KEY = 'hyperflip_leaderboard_data';
+      const storedDataString = localStorage.getItem(LEADERBOARD_STORAGE_KEY);
+      
+      if (!storedDataString) {
+        console.log('No leaderboard data found, initializing empty array');
+        // Initialize with empty array
+        localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify([]));
+      }
+    }
+    
+    // Load bet history
     if (address) {
-      // Load bet history first
+      // Load bet history
       try {
         // Use the user's wallet address as part of the key
         const storageKey = `betHistory_${address.toLowerCase()}`;
@@ -398,19 +445,6 @@ export function CoinFlip() {
         setBetHistory([]);
       }
     }
-    
-    // Reset game state on mount
-    setGameResult(null);
-    setSelectedAmount(0);
-    setIsFlipping(false);
-    setPendingBet(null);
-    setLastProcessedBet(null);
-    setIsResetting(false);
-    setLastResetTime(Math.floor(Date.now() / 1000));
-    
-    // Clear any game state from localStorage
-    localStorage.removeItem('lastProcessedBet');
-    localStorage.removeItem('gameResult');
   }, [address]);
 
   // Get allowed bet amounts
@@ -438,6 +472,11 @@ export function CoinFlip() {
 
   // Check for existing settled bets on mount
   useEffect(() => {
+    // ALWAYS skip this check to ensure we start on betting interface
+    return;
+    
+    // The code below is disabled to prevent showing win/loss screen on initial load
+    /*
     // Skip if we're resetting or already have a game result
     if (isResetting || gameResult !== null) {
       return;
@@ -460,56 +499,114 @@ export function CoinFlip() {
       if (isSettled && Number(placedAt) > lastResetTime) {
         console.log('Found settled bet on mount:', playerWon ? 'WIN' : 'LOSE');
         setGameResult(playerWon ? 'win' : 'lose');
-        setLastProcessedBet(placedAt);
+        setLastProcessedBet(placedAt.toString());
       }
     }
+    */
   }, [betDetails, gameResult, isResetting, pendingBet, lastResetTime]);
 
+  // Check for free bet eligibility
+  useEffect(() => {
+    if (!address || !isConnected || !mounted) return;
+
   // Check if user is eligible for a free bet
-  const { data: freeBetEligibility, refetch: refetchFreeBetEligibility } = useContractRead({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'isWhitelistedForFreeBet',
-    args: address ? [address] : undefined,
-  });
-
-  // Check if user has already used their free bet
-  const { data: usedFreeBet, refetch: refetchUsedFreeBet } = useContractRead({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'hasUsedFreeBet',
-    args: address ? [address] : undefined,
-  });
-
-  // Update eligibility state when data changes
-  useEffect(() => {
-    console.log('Free bet whitelist check:', { address, freeBetEligibility });
-    console.log('Has used free bet check:', { address, usedFreeBet });
+    const checkFreeBetEligibility = async () => {
+      try {
+        console.log('Checking free bet eligibility for address:', address);
+        
+        // IMPORTANT: First check if this is a new wallet connection
+        // If we just connected, we should show the free bet popup
+        const isNewConnection = sessionStorage.getItem(`wallet_connected_${address.toLowerCase()}`) !== 'true';
+        if (isNewConnection) {
+          console.log('New wallet connection detected, checking free bet eligibility');
+          sessionStorage.setItem(`wallet_connected_${address.toLowerCase()}`, 'true');
+          
+          // Clear any dismissed flags to ensure the modal shows up for new connections
+          localStorage.removeItem(`freeBet_modal_dismissed_${address.toLowerCase()}`);
+          setShowFreeBetModal(true);
+        }
+        
+        // Check if user has already used their free bet
+        const storageKey = `freeBet_used_${address.toLowerCase()}`;
+        const hasUsedFreeBet = localStorage.getItem(storageKey) === 'true';
+        
+        if (hasUsedFreeBet) {
+          console.log('User has already used their free bet');
+          setIsEligibleForFreeBet(false);
+          setHasUsedFreeBet(true);
+          return;
+        }
+        
+        // Check if user has any bets in history
+        const historyKey = `betHistory_${address.toLowerCase()}`;
+        const savedHistory = localStorage.getItem(historyKey);
+        const hasHistory = savedHistory && JSON.parse(savedHistory).length > 0;
+        
+        // If they have no history, they're eligible for a free bet
+        if (!hasHistory) {
+          console.log('User is eligible for a free bet (no bet history)');
+          setIsEligibleForFreeBet(true);
+          setHasUsedFreeBet(false);
+          setShowFreeBetModal(true);
+          
+          // Store eligibility in localStorage to persist across refreshes
+          localStorage.setItem(`freeBet_eligible_${address.toLowerCase()}`, 'true');
+          
+          // Clear any dismissed flag to ensure the modal shows up
+          localStorage.removeItem(`freeBet_modal_dismissed_${address.toLowerCase()}`);
+        } else {
+          // Check if they were previously marked as eligible (to handle refreshes)
+          const wasEligible = localStorage.getItem(`freeBet_eligible_${address.toLowerCase()}`) === 'true';
+          
+          if (wasEligible && !hasUsedFreeBet) {
+            console.log('User was previously marked as eligible and has not used free bet');
+            setIsEligibleForFreeBet(true);
+            setHasUsedFreeBet(false);
+            setShowFreeBetModal(true);
+            
+            // Clear any dismissed flag to ensure the modal shows up on refresh
+            localStorage.removeItem(`freeBet_modal_dismissed_${address.toLowerCase()}`);
+          } else {
+            console.log('User is not eligible for a free bet (has bet history)');
+            setIsEligibleForFreeBet(false);
+            setHasUsedFreeBet(true);
+            
+            // Mark as used to prevent future checks
+            localStorage.setItem(storageKey, 'true');
+            localStorage.removeItem(`freeBet_eligible_${address.toLowerCase()}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking free bet eligibility:', error);
+        setIsEligibleForFreeBet(false);
+      }
+    };
     
-    if (freeBetEligibility !== undefined) {
-      setIsEligibleForFreeBet(!!freeBetEligibility);
-    }
+    // Run the check immediately
+    checkFreeBetEligibility();
     
-    if (usedFreeBet !== undefined) {
-      setHasUsedFreeBet(!!usedFreeBet);
-    }
-  }, [freeBetEligibility, usedFreeBet, address]);
+    // Also run when component mounts
+    const timer = setTimeout(() => {
+      checkFreeBetEligibility();
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [address, isConnected, mounted]);
 
-  // Refetch free bet eligibility and usage periodically
+  // Show free bet modal if eligible
   useEffect(() => {
-    if (isConnected && address) {
-      // Initial check
-      refetchFreeBetEligibility();
-      refetchUsedFreeBet();
+    if (isEligibleForFreeBet && !hasUsedFreeBet && !gameResult && !pendingBet?.hasBet) {
+      // Show free bet modal after a short delay
+      const timer = setTimeout(() => {
+        console.log('Showing free bet modal');
+        // Set a small amount for the free bet (0.05 HYPE)
+        setSelectedAmount(0.25);
+        // Do NOT mark as used yet - only mark when they actually place the bet
+      }, 1000);
       
-      const interval = setInterval(() => {
-        refetchFreeBetEligibility();
-        refetchUsedFreeBet();
-      }, 10000); // Check every 10 seconds
-      
-      return () => clearInterval(interval);
+      return () => clearTimeout(timer);
     }
-  }, [isConnected, address, refetchFreeBetEligibility, refetchUsedFreeBet]);
+  }, [isEligibleForFreeBet, hasUsedFreeBet, gameResult, pendingBet]);
 
   // Contract writes
   const { writeContract, data: placeBetHash } = useWriteContract();
@@ -606,7 +703,7 @@ export function CoinFlip() {
       placedAt: placedAt.toString(), 
       isSettled, 
       playerWon,
-      lastProcessedBet: lastProcessedBet?.toString(),
+      lastProcessedBet,
       lastResetTime,
       currentTime: Math.floor(Date.now() / 1000),
       currentBetHistory: betHistory
@@ -615,12 +712,12 @@ export function CoinFlip() {
     // Only process if this is a new, settled bet after our last reset
     if (
       isSettled && 
-      (!lastProcessedBet || placedAt !== lastProcessedBet) &&
+      (!lastProcessedBet || placedAt.toString() !== lastProcessedBet) &&
       Number(placedAt) > lastResetTime
     ) {
       console.log('Setting game result from historical bet:', playerWon ? 'WIN' : 'LOSE');
       setGameResult(playerWon ? 'win' : 'lose');
-      setLastProcessedBet(placedAt);
+      setLastProcessedBet(placedAt.toString());
       
       // Convert numeric choice to boolean (false for heads, true for tails)
       const choiceAsBool = selectedChoice === 1;
@@ -644,6 +741,10 @@ export function CoinFlip() {
           const storageKey = `betHistory_${address.toLowerCase()}`;
           localStorage.setItem(storageKey, JSON.stringify(newHistory));
           console.log('Successfully saved bet history to localStorage for address:', address);
+          
+          // Update profile data
+          updateLeaderboardData(address, Number(amount) / 1e18, playerWon);
+          console.log('Updated profile data for historical bet:', { address, amount: Number(amount) / 1e18, won: playerWon });
         } catch (error) {
           console.error('Error saving bet history to localStorage:', error);
         }
@@ -728,8 +829,14 @@ export function CoinFlip() {
         const choiceAsBool = lastPlacedChoice !== null ? lastPlacedChoice : selectedChoice === 1;
         console.log('Using choice for bet history:', { selectedChoice, lastPlacedChoice, choiceAsBool });
         
-        // Store the display amount for the win message
+        // ALWAYS set a valid pendingBetAmount to prevent "You won null" issue
         setPendingBetAmount(displayAmount);
+        
+        // Also store in localStorage as a backup
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pendingBetAmount', displayAmount.toString());
+          console.log('Stored pendingBetAmount in localStorage:', displayAmount);
+        }
         
         // Create bet history item
         const newBet: BetHistoryItem = {
@@ -752,6 +859,10 @@ export function CoinFlip() {
               const storageKey = `betHistory_${address.toLowerCase()}`;
               localStorage.setItem(storageKey, JSON.stringify(newHistory));
               console.log('Successfully saved bet history to localStorage for address:', address);
+              
+              // Update profile data
+              updateLeaderboardData(address, displayAmount, won);
+              console.log('Updated profile data for bet:', { address, amount: displayAmount, won });
             }
           } catch (error) {
             console.error('Error saving bet history to localStorage:', error);
@@ -762,7 +873,7 @@ export function CoinFlip() {
         
         // Reset state
         setCurrentBetAmount(null);
-        setPendingBetAmount(null);
+        // Don't reset pendingBetAmount here, as it's needed for the win message
         setPendingBet(null);
         setLastPlacedChoice(null); // Clear the stored choice
       }
@@ -787,12 +898,21 @@ export function CoinFlip() {
     },
   });
 
-  // After a free bet is placed, refetch the usage status
+  // After a free bet is placed, update the usage status
   useEffect(() => {
     if (isPlaceBetSuccess) {
-      refetchUsedFreeBet();
+      // Update free bet status directly
+      if (address) {
+        const storageKey = `freeBet_used_${address.toLowerCase()}`;
+        localStorage.setItem(storageKey, 'true');
+        setHasUsedFreeBet(true);
+        setIsEligibleForFreeBet(false);
+        
+        // Also remove the eligibility flag
+        localStorage.removeItem(`freeBet_eligible_${address.toLowerCase()}`);
+      }
     }
-  }, [isPlaceBetSuccess, refetchUsedFreeBet]);
+  }, [isPlaceBetSuccess, address]);
 
   // Update window size on resize
   useEffect(() => {
@@ -808,6 +928,131 @@ export function CoinFlip() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Check for dismissed modal flag
+  useEffect(() => {
+    if (!address) return;
+    
+    // Check if this is a new wallet connection in this session
+    const isNewConnection = sessionStorage.getItem(`wallet_connected_${address.toLowerCase()}`) !== 'true';
+    
+    if (isNewConnection) {
+      // For new connections, always show the modal if eligible
+      console.log('New wallet connection detected, showing free bet modal if eligible');
+      sessionStorage.setItem(`wallet_connected_${address.toLowerCase()}`, 'true');
+      
+      // Clear any dismissed flags
+      localStorage.removeItem(`freeBet_modal_dismissed_${address.toLowerCase()}`);
+      setShowFreeBetModal(true);
+    } else {
+      // For existing connections, check if the modal was dismissed
+      const modalDismissed = localStorage.getItem(`freeBet_modal_dismissed_${address.toLowerCase()}`) === 'true';
+      if (modalDismissed) {
+        console.log('Modal was previously dismissed, hiding it');
+        setShowFreeBetModal(false);
+      } else {
+        setShowFreeBetModal(true);
+      }
+    }
+  }, [address]);
+
+  // Clear session storage on component unmount
+  useEffect(() => {
+    return () => {
+      if (address) {
+        // Clear the session storage when the component unmounts
+        sessionStorage.removeItem(`wallet_connected_${address.toLowerCase()}`);
+      }
+    };
+  }, [address]);
+
+  // This function can be called from the console for testing
+  // Just type in the browser console: window.resetFreeBetStatus()
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Use type assertion to avoid TypeScript error
+      (window as any).resetFreeBetStatus = () => {
+        if (!address) {
+          console.log('No wallet connected, cannot reset free bet status');
+          return;
+        }
+        
+        console.log('Resetting free bet status for address:', address);
+        
+        // Clear all free bet related storage
+        localStorage.removeItem(`freeBet_used_${address.toLowerCase()}`);
+        localStorage.removeItem(`freeBet_eligible_${address.toLowerCase()}`);
+        localStorage.removeItem(`freeBet_modal_dismissed_${address.toLowerCase()}`);
+        sessionStorage.removeItem(`wallet_connected_${address.toLowerCase()}`);
+        
+        // Reset state
+        setIsEligibleForFreeBet(true);
+        setHasUsedFreeBet(false);
+        setShowFreeBetModal(true);
+        
+        console.log('Free bet status reset complete. Refresh the page to see the changes.');
+      };
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        // Use type assertion to avoid TypeScript error
+        (window as any).resetFreeBetStatus = undefined;
+      }
+    };
+  }, [address]);
+
+  // Always clear pendingBetAmount from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Clear any stored pendingBetAmount to prevent "You won null" issue
+      localStorage.removeItem('pendingBetAmount');
+    }
+  }, []);
+
+  // Add a safety check to load pendingBetAmount from localStorage if it's null when gameResult is set
+  useEffect(() => {
+    if (gameResult && pendingBetAmount === null && typeof window !== 'undefined') {
+      // Try to load from localStorage
+      const storedAmount = localStorage.getItem('pendingBetAmount');
+      if (storedAmount) {
+        const amount = parseFloat(storedAmount);
+        console.log('Loaded pendingBetAmount from localStorage:', amount);
+        setPendingBetAmount(amount);
+      } else {
+        // Fallback to a default value to prevent "You won null"
+        console.log('No pendingBetAmount found in localStorage, using default value');
+        setPendingBetAmount(0.25); // Default to smallest bet amount
+      }
+    }
+  }, [gameResult, pendingBetAmount]);
+
+  // CRITICAL: Always reset game state on initial component mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('INITIAL MOUNT: Forcing complete game state reset');
+      
+      // Reset ALL game state variables to initial values
+      setGameResult(null);
+      setSelectedAmount(0);
+      setIsFlipping(false);
+      setPendingBet(null);
+      setPendingBetAmount(null);
+      setCurrentBetAmount(null);
+      setLastProcessedBet(null);
+      setIsResetting(false);
+      setLastResetTime(Math.floor(Date.now() / 1000));
+      
+      // Clear ALL game state from localStorage
+      localStorage.removeItem('gameState');
+      localStorage.removeItem('gameResult');
+      localStorage.removeItem('lastProcessedBet');
+      localStorage.removeItem('pendingBetAmount');
+      localStorage.removeItem('currentBetAmount');
+      
+      console.log('Initial game state reset complete');
+    }
+  }, []); // Empty dependency array means this runs once on mount
 
   const handleBet = async () => {
     if (!selectedAmount) return;
@@ -874,48 +1119,37 @@ export function CoinFlip() {
     }
   };
 
-  const handlePlayAgain = async () => {
-    console.log('Resetting game state');
+  // Handle "Play Again" button click
+  const handlePlayAgain = () => {
+    console.log('Play Again clicked - resetting game state completely');
     
-    // Set resetting flag to prevent processing old bet details
-    setIsResetting(true);
-    
-    // Update reset timestamp first
-    const currentTime = Math.floor(Date.now() / 1000);
-    setLastResetTime(currentTime);
-    console.log('Setting reset time to:', currentTime);
-    
-    // Clear game state but preserve bet history
+    // COMPLETE RESET: Reset ALL game state variables to initial values
     setGameResult(null);
     setSelectedAmount(0);
     setIsFlipping(false);
     setPendingBet(null);
-    setLastProcessedBet(null);
-    setCurrentBetAmount(null);
     setPendingBetAmount(null);
-    setLastPlacedChoice(null); // Reset the stored choice
+    setCurrentBetAmount(null);
+    setLastProcessedBet(null);
+    setIsResetting(false);
+    setLastResetTime(Math.floor(Date.now() / 1000));
     
-    try {
-      // Force refetch of all contract state
-      await Promise.all([
-        refetchPendingBet(),
-        refetchBetDetails()
-      ]);
-      
-      // Longer delay to ensure state updates have propagated
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Clear resetting flag after everything is done
-      setIsResetting(false);
-      console.log('Game state reset complete');
-    } catch (error) {
-      console.error('Error resetting game state:', error);
-      // Clear resetting flag even on error
-      setIsResetting(false);
-    }
+    // Clear ALL game state from localStorage
+    localStorage.removeItem('gameState');
+    localStorage.removeItem('gameResult');
+    localStorage.removeItem('lastProcessedBet');
+    localStorage.removeItem('pendingBetAmount');
+    localStorage.removeItem('currentBetAmount');
+    
+    console.log('Game state completely reset for Play Again');
   };
 
   const handleFreeBet = async () => {
+    if (!address || !isConnected) {
+      console.log('Wallet not connected');
+      return;
+    }
+    
     try {
       setIsFlipping(true);
       console.log('Placing free bet...');
@@ -929,19 +1163,26 @@ export function CoinFlip() {
       console.log('Storing choice for free bet:', { selectedChoice, choiceAsBool });
       setLastPlacedChoice(choiceAsBool);
       
-      const result = await writeContract({
+      // Mark free bet as used in localStorage
+      const storageKey = `freeBet_used_${address.toLowerCase()}`;
+      localStorage.setItem(storageKey, 'true');
+      setHasUsedFreeBet(true);
+      setIsEligibleForFreeBet(false);
+      console.log('Marked free bet as used for address:', address);
+      
+      // Call the contract to place the free bet
+      await writeContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
         functionName: 'placeFreeBet',
         args: [selectedChoice],
       });
-      console.log('Free bet transaction submitted', result);
       
-      // Immediately refetch to update the UI
-      refetchUsedFreeBet();
+      console.log('Free bet placed successfully');
       
-      // Also refetch pending bet status
-      refetchPendingBet();
+      // Update the pending bet state
+      await refetchPendingBet();
+      
     } catch (error) {
       console.error('Error placing free bet:', error);
       setIsFlipping(false);
@@ -954,12 +1195,14 @@ export function CoinFlip() {
   const FreeBetBanner = () => {
     console.log('Rendering FreeBetBanner, isEligibleForFreeBet:', isEligibleForFreeBet, 'hasUsedFreeBet:', hasUsedFreeBet);
     
-    if (!isEligibleForFreeBet || hasUsedFreeBet) return null;
+    // Even if the modal is dismissed, we still want to show the banner
+    if (!isEligibleForFreeBet || hasUsedFreeBet || !address) return null;
     
     return (
-      <div className="bg-green-600 text-white p-4 rounded-lg mb-6 text-center animate-pulse w-full">
-        <p className="font-bold text-lg">ðŸŽ‰ You're eligible for a free bet! ðŸŽ‰</p>
-        <p className="text-sm mt-1">Click the green button below to use your free 0.25 HYPE bet</p>
+      <div className="bg-green-600 text-white p-4 rounded-lg mb-6 text-center w-full">
+        <p className="font-bold text-lg">🎉 You're eligible for a free bet! 🎉</p>
+        <p className="text-sm mt-1 mb-3">Welcome to HyperFlip! You're eligible for a free 0.25 HYPE bet on us!</p>
+        <p className="text-sm italic">Select Heads or Tails, then click the green "Claim Free 0.25 HYPE Bet" button below.</p>
       </div>
     );
   };
@@ -973,6 +1216,217 @@ export function CoinFlip() {
     gravity: 0.3,
     colors: ['#FFD700', '#FFA500', '#FF4500', '#9370DB', '#00BFFF', '#32CD32'],
     tweenDuration: 5000
+  };
+
+  // Update profile data when a bet is settled
+  const updateLeaderboardData = async (address: string, amount: number, playerWon: boolean) => {
+    if (!address) return;
+    
+    try {
+      // Get existing profile data from localStorage
+      const PROFILE_STORAGE_KEY = `hyperflip_profile_${address.toLowerCase()}`;
+      let profileData = {
+        address: address.toLowerCase(),
+        totalBets: 0,
+        totalWagered: 0,
+        totalProfit: 0,
+        wins: 0,
+        losses: 0,
+        winRate: 0
+      };
+      
+      try {
+        const storedData = localStorage.getItem(PROFILE_STORAGE_KEY);
+        if (storedData) {
+          profileData = JSON.parse(storedData);
+        }
+      } catch (e) {
+        console.error('Error reading profile data from localStorage:', e);
+      }
+      
+      console.log('Current profile data:', profileData);
+      
+      const normalizedAmount = Number(amount);
+      
+      // Update player stats
+      profileData.totalBets += 1;
+      profileData.totalWagered += normalizedAmount;
+      
+      // Update profit
+      if (playerWon) {
+        profileData.totalProfit += normalizedAmount;
+        profileData.wins += 1;
+      } else {
+        profileData.totalProfit -= normalizedAmount;
+        profileData.losses += 1;
+      }
+      
+      // Calculate win rate
+      const totalGames = profileData.wins + profileData.losses;
+      profileData.winRate = totalGames > 0 ? Math.round((profileData.wins / totalGames) * 100) : 0;
+      
+      console.log('Updated profile data:', profileData);
+      
+      // Save updated data to localStorage
+      localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profileData));
+      console.log('Saved updated profile data to localStorage');
+      
+      // Also call the API to record the bet (for future database implementation)
+      try {
+        const response = await fetch('/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            address: address.toLowerCase(),
+            betAmount: amount,
+            playerWon
+          })
+        });
+        
+        if (!response.ok) {
+          console.warn('API call failed, but localStorage was updated');
+        }
+      } catch (apiError) {
+        console.warn('API call failed, but localStorage was updated:', apiError);
+      }
+    } catch (error) {
+      console.error('Error updating profile data:', error);
+    }
+  };
+
+  // Handle navigation to profile
+  const handleLeaderboardClick = (e: React.MouseEvent) => {
+    // Store current game state in localStorage
+    localStorage.setItem('gameState', JSON.stringify({
+      gameResult,
+      selectedAmount,
+      isFlipping,
+      pendingBet,
+      lastProcessedBet,
+      lastResetTime
+    }));
+    
+    // Let the navigation proceed
+  };
+
+  // Place a bet
+  const handlePlaceBet = async () => {
+    if (!address || !isConnected) {
+      console.log('Wallet not connected');
+      return;
+    }
+    
+    if (selectedAmount <= 0) {
+      console.log('No amount selected');
+      return;
+    }
+    
+    try {
+      setIsFlipping(true);
+      
+      // Convert choice to boolean (0 = heads = false, 1 = tails = true)
+      const choiceAsBool = selectedChoice === 1;
+      
+      // Store the choice for later reference
+      setLastPlacedChoice(choiceAsBool);
+      
+      // Store the bet amount for display in the result screen
+      setCurrentBetAmount(selectedAmount);
+      setPendingBetAmount(selectedAmount);
+      
+      // Always use regular bet - free bets are handled by the dedicated button
+      console.log('Using regular bet');
+      // Call the contract to place the bet
+      await writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'placeBet',
+        args: [selectedChoice], // Use selectedChoice directly which is already 0 or 1
+        value: parseEther(selectedAmount.toString())
+      });
+      
+      console.log('Bet placed successfully');
+      
+      // Update the pending bet state
+      await refetchPendingBet();
+      
+    } catch (error) {
+      console.error('Error placing bet:', error);
+      setIsFlipping(false);
+      // Clear pending bet amount on error
+      setPendingBetAmount(null);
+    }
+  };
+
+  // Modify the Place Bet Button to show "Place Free Bet" when appropriate
+  // Place Bet Button
+  const renderPlaceBetButton = () => {
+    // Determine if this is a free bet (0.25 HYPE and eligible)
+    const isFreeBet = isEligibleForFreeBet && !hasUsedFreeBet && selectedAmount === 0.25;
+    
+    return (
+      <button
+        onClick={handlePlaceBet}
+        disabled={isFlipping || !isConnected || !selectedAmount}
+        className={`w-full max-w-xs mt-4 py-3 px-6 rounded-lg text-lg font-bold transition-all ${
+          isFlipping || !isConnected || !selectedAmount
+            ? 'bg-gray-600 cursor-not-allowed'
+            : isFreeBet 
+              ? 'bg-green-600 hover:bg-green-500 text-white'
+              : 'bg-[#04e6e0] hover:bg-[#04e6e0]/80 text-black'
+        }`}
+      >
+        {isFlipping ? 'Flipping...' : isFreeBet ? 'Place Free Bet' : 'Place Bet'}
+      </button>
+    );
+  };
+
+  // Add a FreeBetModal component
+  const FreeBetModal = () => {
+    // Only show if eligible and the modal is not dismissed
+    if (!isEligibleForFreeBet || hasUsedFreeBet || gameResult || pendingBet?.hasBet || !address || !showFreeBetModal) return null;
+    
+    return (
+      <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/70">
+        <div className="bg-black border-2 border-[#04e6e0] p-6 rounded-lg max-w-md w-full text-center">
+          <h2 className="text-2xl font-bold text-[#04e6e0] mb-4">🎉 Free Bet Offer! 🎉</h2>
+          <p className="text-white mb-2">Welcome to HyperFlip! You're eligible for a free 0.25 HYPE bet on us!</p>
+          <p className="text-white mb-6 text-sm italic">Select Heads or Tails, then click the green "Claim Free Bet" button below the coin.</p>
+          <div className="flex justify-center space-x-4">
+            <button 
+              onClick={() => {
+                // Just hide the modal, user will use the dedicated free bet button
+                setShowFreeBetModal(false);
+                // Store the dismissed state in localStorage
+                if (address) {
+                  localStorage.setItem(`freeBet_modal_dismissed_${address.toLowerCase()}`, 'true');
+                }
+              }}
+              className="px-6 py-2 bg-[#04e6e0] text-black rounded-lg font-bold hover:bg-[#04e6e0]/80 transition-all"
+            >
+              Got It
+            </button>
+            <button 
+              onClick={() => {
+                console.log('Skipping free bet for now');
+                // Just hide the modal without marking the free bet as used
+                setShowFreeBetModal(false);
+                
+                // Store the dismissed state in localStorage
+                if (address) {
+                  localStorage.setItem(`freeBet_modal_dismissed_${address.toLowerCase()}`, 'true');
+                }
+              }}
+              className="px-6 py-2 bg-gray-700 text-white rounded-lg font-bold hover:bg-gray-600 transition-all"
+            >
+              Skip for Now
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (!mounted) {
@@ -1004,44 +1458,30 @@ export function CoinFlip() {
         <div className="glow-circle"></div>
         <div className="glow-circle"></div>
       </div>
+      
+      {/* Free Bet Modal */}
+      <FreeBetModal />
 
-      {/* Logo */}
-      <div className="absolute top-6 left-6 z-10">
-        <h1 className="logo-text text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#04e6e0] to-[#03a8a3] drop-shadow-[0_0_10px_rgba(4,230,224,0.3)]">
-          HyperFlip
-        </h1>
-      </div>
-
-      {/* Navigation Links */}
-      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-10">
-        <Link href="/leaderboard" className="text-[#04e6e0] hover:text-white transition-colors font-semibold text-lg">
-          Leaderboard
-        </Link>
-      </div>
-
-      {/* X Logo Link */}
-      <a 
-        href="https://x.com/HyperFlipEVM" 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        className="absolute bottom-6 left-6 z-10 hover:opacity-80 transition-opacity"
-        aria-label="Follow us on X"
-      >
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          width="32" 
-          height="32" 
-          viewBox="0 0 24 24" 
-          fill="#04e6e0"
-        >
-          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-        </svg>
-      </a>
-
-      {/* Wallet Connect */}
-      <div className="absolute top-6 right-6 z-10">
-        <ConnectButton />
-      </div>
+      {/* Header */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-[#04e6e0]/20">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center space-x-6">
+            <h1 className="logo-text text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#04e6e0] to-[#03a8a3] drop-shadow-[0_0_10px_rgba(4,230,224,0.3)]">
+              HyperFlip
+            </h1>
+            <Link 
+              href="/profile" 
+              onClick={handleLeaderboardClick}
+              className="text-[#04e6e0] hover:text-[#04e6e0]/80 transition-colors"
+            >
+              Profile
+            </Link>
+          </div>
+          <div>
+            <ConnectButton />
+          </div>
+        </div>
+          </div>
 
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center min-h-screen max-w-2xl mx-auto px-4 pt-24 pb-8">
@@ -1051,8 +1491,12 @@ export function CoinFlip() {
         {/* Bet History - Always visible */}
         <div className="w-full">
           <BetHistory history={betHistory} />
-        </div>
+            </div>
 
+        {/* Free Bet Banner - Show when eligible */}
+        <FreeBetBanner />
+
+        {/* Game State Conditional Rendering */}
         {gameResult ? (
           // Win/Loss Screen
           <div className="w-full bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg text-center">
@@ -1073,7 +1517,7 @@ export function CoinFlip() {
               </div>
             </div>
           </div>
-        ) : pendingBet?.hasBet ? (
+          ) : pendingBet?.hasBet ? (
           // Reveal Results Page
           <div className="w-full bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg text-center">
             <div className="flex flex-col items-center space-y-4">
@@ -1090,8 +1534,8 @@ export function CoinFlip() {
                       : 'Ready to reveal!'}
                   </p>
                 </div>
-                <button
-                  onClick={handleSettle}
+              <button
+                onClick={handleSettle}
                   disabled={isFlipping || (!!pendingBet?.currentBlock && !!pendingBet?.targetBlock && pendingBet.currentBlock < pendingBet.targetBlock)}
                   className={`px-8 py-3 rounded-lg font-bold transition-all ${
                     isFlipping || (!!pendingBet?.currentBlock && !!pendingBet?.targetBlock && pendingBet.currentBlock < pendingBet.targetBlock)
@@ -1100,11 +1544,11 @@ export function CoinFlip() {
                   }`}
                 >
                   {isFlipping ? 'Revealing...' : 'Reveal Results'}
-                </button>
+              </button>
               </div>
             </div>
-          </div>
-        ) : (
+            </div>
+          ) : (
           // Betting Interface
           <div className="w-full bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg">
             <div className="flex flex-col items-center space-y-1">
@@ -1131,6 +1575,19 @@ export function CoinFlip() {
                 </CoinSelector>
               </div>
 
+              {/* Free Bet Button - Only show if eligible */}
+              {isEligibleForFreeBet && !hasUsedFreeBet && !isFlipping && isConnected && (
+                <button
+                  onClick={handleFreeBet}
+                  disabled={isFlipping || !isConnected}
+                  className="mt-4 w-full max-w-xs px-4 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-500 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="flex items-center">
+                    {isFlipping ? 'Placing Free Bet...' : 'Claim Free 0.25 HYPE Bet'} <span className="ml-2 text-xs bg-white text-green-600 px-1 rounded">FREE</span>
+                  </span>
+                </button>
+              )}
+
               {/* Bet Amount Selection */}
               <div className="mt-4 grid grid-cols-2 gap-2 w-full max-w-xs">
                 {allowedBets.map((amount) => (
@@ -1144,14 +1601,14 @@ export function CoinFlip() {
                     } ${isFlipping || !isConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={isFlipping || !isConnected}
                   >
-                    {Number(amount) / 1e18} HYPE
+                    {`${Number(amount) / 1e18} HYPE`}
                   </button>
                 ))}
               </div>
-
+              
               {/* Place Bet Button */}
               <button
-                onClick={handleBet}
+                onClick={handlePlaceBet}
                 disabled={isFlipping || !isConnected || !selectedAmount}
                 className={`w-full max-w-xs mt-4 py-3 px-6 rounded-lg text-lg font-bold transition-all ${
                   isFlipping || !isConnected || !selectedAmount
@@ -1163,8 +1620,8 @@ export function CoinFlip() {
               </button>
             </div>
           </div>
-        )}
-      </div>
+          )}
+        </div>
 
       <style jsx global>
         {backgroundStyles}

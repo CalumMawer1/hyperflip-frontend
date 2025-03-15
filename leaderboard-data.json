@@ -1,0 +1,20 @@
+[
+  {
+    "address": "0x5de0c18ad34e2895aa6b7088e4e42305909d409d",
+    "totalBets": 14,
+    "totalWagered": 3.3775,
+    "totalProfit": -2.895,
+    "wins": 1,
+    "losses": 13,
+    "winRate": 7
+  },
+  {
+    "address": "0x80dd007cf9f0e7231dbec52e39c28a74a804c69c",
+    "totalBets": 7,
+    "totalWagered": 1.68875,
+    "totalProfit": 1.68875,
+    "wins": 7,
+    "losses": 0,
+    "winRate": 100
+  }
+]
