@@ -1,0 +1,7 @@
+[33mcommit a5e72f409c052147f7f21927843ad28e50252179[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: CalumMawer1 <calummawer1@gmail.com>
+Date:   Fri Mar 14 22:49:39 2025 -0700
+
+    Add X logo in bottom left corner linking to HyperFlipEVM account
+
+src/components/CoinFlip.tsx

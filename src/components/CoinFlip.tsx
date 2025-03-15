@@ -7,6 +7,7 @@ import { parseEther } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../config/contract';
 import Confetti from 'react-confetti';
 import Image from 'next/image';
+import Link from 'next/link';
 
 // Add CSS for the futuristic background
 const backgroundStyles = `
@@ -1009,6 +1010,13 @@ export function CoinFlip() {
         <h1 className="logo-text text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#04e6e0] to-[#03a8a3] drop-shadow-[0_0_10px_rgba(4,230,224,0.3)]">
           HyperFlip
         </h1>
+      </div>
+
+      {/* Navigation Links */}
+      <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-10">
+        <Link href="/leaderboard" className="text-[#04e6e0] hover:text-white transition-colors font-semibold text-lg">
+          Leaderboard
+        </Link>
       </div>
 
       {/* X Logo Link */}

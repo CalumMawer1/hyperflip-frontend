@@ -72,6 +72,26 @@ export const CONTRACT_ABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "getLeaderboard",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "address", "name": "player", "type": "address" },
+          { "internalType": "uint256", "name": "totalBets", "type": "uint256" },
+          { "internalType": "uint256", "name": "wins", "type": "uint256" },
+          { "internalType": "uint256", "name": "totalWagered", "type": "uint256" },
+          { "internalType": "int256", "name": "totalProfit", "type": "int256" }
+        ],
+        "internalType": "struct HyperFlip.LeaderboardEntry[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "anonymous": false,
     "inputs": [
       { "indexed": true, "internalType": "address", "name": "player", "type": "address" },
