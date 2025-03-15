@@ -6,20 +6,154 @@ import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../config/contract';
 import Confetti from 'react-confetti';
+import Image from 'next/image';
+
+// Add CSS for the futuristic background
+const backgroundStyles = `
+  .futuristic-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #000, #001a1a);
+    z-index: -1;
+    overflow: hidden;
+  }
+  
+  .futuristic-background::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 20% 35%, rgba(4, 230, 224, 0.15) 0%, transparent 25%),
+      radial-gradient(circle at 80% 10%, rgba(4, 230, 224, 0.1) 0%, transparent 20%);
+  }
+  
+  .grid-lines {
+    position: absolute;
+    width: 200%;
+    height: 200%;
+    top: -50%;
+    left: -50%;
+    background-image: 
+      linear-gradient(rgba(4, 230, 224, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(4, 230, 224, 0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
+    transform: perspective(500px) rotateX(60deg);
+    animation: gridMove 60s linear infinite;
+    opacity: 0.4;
+  }
+  
+  .glow-circle {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(4, 230, 224, 0.2) 0%, transparent 70%);
+    filter: blur(20px);
+    opacity: 0.5;
+    animation: pulse 10s ease-in-out infinite;
+  }
+  
+  .glow-circle:nth-child(1) {
+    top: 20%;
+    left: 70%;
+    animation-delay: 0s;
+  }
+  
+  .glow-circle:nth-child(2) {
+    top: 60%;
+    left: 30%;
+    width: 200px;
+    height: 200px;
+    animation-delay: -5s;
+  }
+  
+  @keyframes gridMove {
+    0% {
+      transform: perspective(500px) rotateX(60deg) translateY(0);
+    }
+    100% {
+      transform: perspective(500px) rotateX(60deg) translateY(50px);
+    }
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 0.3;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.1);
+    }
+  }
+`;
 
 type BetHistoryItem = {
   result: 'win' | 'lose';
   amount: number;
   timestamp: number;
   isFree?: boolean;
+  choice: boolean; // false for heads, true for tails (matching contract)
 };
+
+// Cat coin SVG component for reuse
+const CatCoinSVG = ({ className = "w-6 h-6" }: { className?: string }) => (
+  <svg viewBox="0 0 200 200" className={className}>
+    {/* Coin background */}
+    <circle cx="100" cy="100" r="98" fill="#000000" />
+    <circle cx="100" cy="100" r="95" fill="#000000" />
+    
+    {/* H letter */}
+    <text
+      x="100"
+      y="115"
+      textAnchor="middle"
+      dominantBaseline="middle"
+      fill="#04e6e0"
+      fontSize="120"
+      fontWeight="bold"
+      fontFamily="Arial"
+    >
+      H
+    </text>
+  </svg>
+);
+
+// Cat tail SVG component for the tails side
+const TailCoinSVG = ({ className = "w-6 h-6" }: { className?: string }) => (
+  <svg viewBox="0 0 200 200" className={className}>
+    {/* Coin background */}
+    <circle cx="100" cy="100" r="98" fill="#000000" />
+    <circle cx="100" cy="100" r="95" fill="#000000" />
+    
+    {/* T letter */}
+    <text
+      x="100"
+      y="115"
+      textAnchor="middle"
+      dominantBaseline="middle"
+      fill="#04e6e0"
+      fontSize="120"
+      fontWeight="bold"
+      fontFamily="Arial"
+    >
+      T
+    </text>
+  </svg>
+);
 
 const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
   console.log('BetHistory render:', history);
   
   if (!history || history.length === 0) {
     return (
-      <div className="w-full bg-gray-800/50 p-4 rounded-lg mb-6 text-center">
+      <div className="w-full bg-black/80 border border-[#04e6e0]/20 p-4 rounded-lg mb-6 text-center">
         <h3 className="text-lg font-semibold mb-2">Recent Flips</h3>
         <p className="text-gray-400">No bets yet. Make your first bet!</p>
       </div>
@@ -37,37 +171,75 @@ const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
   };
 
   return (
-    <div className="w-full bg-gray-800 p-4 rounded-lg mb-6 overflow-x-auto">
+    <div className="w-full bg-black border border-[#04e6e0]/20 p-4 rounded-lg mb-6">
       <h3 className="text-lg font-semibold mb-3 text-center">Recent Flips</h3>
-      <div className="flex justify-center space-x-2 overflow-x-auto pb-2">
-        {history.map((bet, index) => (
-          <div
-            key={index}
-            className={`flex flex-col items-center p-3 rounded-lg min-w-[90px] ${
-              bet.result === 'win' ? 'bg-green-600/20' : 'bg-red-600/20'
-            }`}
-          >
-            <span className="text-2xl mb-1">
-              {bet.result === 'win' ? 'H' : 'T'}
-            </span>
-            <span className="text-sm text-gray-300">
-              {normalizeAmount(bet.amount)} HYPE
-              {bet.isFree && <span className="text-xs block text-green-400">(Free)</span>}
-            </span>
-          </div>
-        ))}
+      <div className="flex justify-start space-x-2 overflow-x-auto pb-2 px-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+        {history.map((bet, index) => {
+          // Always show the user's selected choice
+          const isHeads = bet.choice === false;
+          
+          return (
+            <div
+              key={index}
+              className={`flex flex-col items-center p-3 rounded-lg min-w-[90px] ${
+                bet.result === 'win' ? 'bg-[#04e6e0]/10 border border-[#04e6e0]/30' : 'bg-red-600/20'
+              } ${index === 0 ? 'ml-1' : ''} ${index === history.length - 1 ? 'mr-1' : ''}`}
+            >
+              <div className="mb-2 h-8 flex items-center justify-center">
+                {isHeads ? (
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                    <CatCoinSVG className="w-8 h-8" />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                    <TailCoinSVG className="w-8 h-8" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col items-center justify-center text-center">
+                <span className="text-sm font-medium text-gray-300">
+                  {normalizeAmount(bet.amount)} HYPE
+                </span>
+                {bet.isFree && <span className="text-xs block text-green-400">(Free)</span>}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 };
 
 const Coin = ({ isFlipping, result, selectedChoice = 0 }: { isFlipping: boolean; result: 'win' | 'lose' | null; selectedChoice?: 0 | 1 }) => {
+  // Convert numeric choice to boolean to match contract (0 = heads/false, 1 = tails/true)
+  const choiceAsBool = selectedChoice === 1;
+  
+  // Determine border and text color based on result
+  const borderColor = result === 'lose' ? 'border-red-600' : 'border-[#04e6e0]';
+  const textColor = result === 'lose' ? 'text-red-600' : 'text-[#04e6e0]';
+  
+  // Cat coin for heads
+  const CatCoin = () => (
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="w-[200px] h-[200px] flex items-center justify-center relative overflow-hidden rounded-full">
+        <CatCoinSVG className="w-full h-full" />
+      </div>
+    </div>
+  );
+  
+  // Tail coin for tails
+  const TailCoin = () => (
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="w-[95%] h-[95%] flex items-center justify-center relative overflow-hidden">
+        <TailCoinSVG className="w-full h-full" />
+      </div>
+    </div>
+  );
+  
   return (
     <div className="relative w-32 h-32 mb-8 mx-auto">
       <motion.div
-        className={`w-full h-full rounded-full flex items-center justify-center text-4xl shadow-lg border-4 border-green-500 ${
-          isFlipping ? 'bg-black' : 'bg-black'
-        }`}
+        className={`w-full h-full rounded-full flex items-center justify-center text-4xl shadow-lg border-4 ${borderColor} bg-black`}
         animate={{
           rotateX: isFlipping ? [0, 720, 1440, 2160, 2880] : 0,
           scale: isFlipping ? [1, 1.2, 1] : 1,
@@ -79,47 +251,51 @@ const Coin = ({ isFlipping, result, selectedChoice = 0 }: { isFlipping: boolean;
         }}
       >
         <div className="flex flex-col items-center justify-center w-full h-full relative">
-          {!isFlipping && result === 'win' && (
-            <span className="text-4xl font-bold text-green-500">H</span>
-          )}
-          {!isFlipping && result === 'lose' && (
-            <span className="text-4xl font-bold text-green-500">T</span>
-          )}
-          {(isFlipping || !result) && (
+          {!isFlipping && result !== null && (
             <>
-              {isFlipping ? (
-                <>
-                  <motion.div
-                    className="absolute w-full h-full flex items-center justify-center"
-                    animate={{
-                      opacity: isFlipping ? [1, 0, 1, 0, 1] : 1,
-                    }}
-                    transition={{
-                      duration: isFlipping ? 2 : 0.5,
-                      repeat: isFlipping ? Infinity : 0,
-                      ease: "linear"
-                    }}
-                  >
-                    <span className="text-4xl font-bold text-green-500">H</span>
-                  </motion.div>
-                  <motion.div
-                    className="absolute w-full h-full flex items-center justify-center"
-                    animate={{
-                      opacity: isFlipping ? [0, 1, 0, 1, 0] : 0,
-                    }}
-                    transition={{
-                      duration: isFlipping ? 2 : 0.5,
-                      repeat: isFlipping ? Infinity : 0,
-                      ease: "linear"
-                    }}
-                  >
-                    <span className="text-4xl font-bold text-green-500">T</span>
-                  </motion.div>
-                </>
+              {choiceAsBool === false ? (
+                <CatCoin />
               ) : (
-                <span className="text-4xl font-bold text-green-500">
-                  {selectedChoice === 0 ? 'H' : 'T'}
-                </span>
+                <TailCoin />
+              )}
+            </>
+          )}
+          {isFlipping && (
+            <>
+              <motion.div
+                className="absolute w-full h-full flex items-center justify-center"
+                animate={{
+                  opacity: isFlipping ? [1, 0, 1, 0, 1] : 1,
+                }}
+                transition={{
+                  duration: isFlipping ? 2 : 0.5,
+                  repeat: isFlipping ? Infinity : 0,
+                  ease: "linear"
+                }}
+              >
+                <CatCoin />
+              </motion.div>
+              <motion.div
+                className="absolute w-full h-full flex items-center justify-center"
+                animate={{
+                  opacity: isFlipping ? [0, 1, 0, 1, 0] : 0,
+                }}
+                transition={{
+                  duration: isFlipping ? 2 : 0.5,
+                  repeat: isFlipping ? Infinity : 0,
+                  ease: "linear"
+                }}
+              >
+                <TailCoin />
+              </motion.div>
+            </>
+          )}
+          {!isFlipping && result === null && (
+            <>
+              {choiceAsBool === false ? (
+                <CatCoin />
+              ) : (
+                <TailCoin />
               )}
             </>
           )}
@@ -151,44 +327,66 @@ export function CoinFlip() {
   const [originalBetAmounts, setOriginalBetAmounts] = useState<Record<string, number>>({});
   const [currentBetAmount, setCurrentBetAmount] = useState<number | null>(null);
   const [pendingBetAmount, setPendingBetAmount] = useState<number | null>(null);
+  const [lastPlacedChoice, setLastPlacedChoice] = useState<boolean | null>(null);
   const [windowSize, setWindowSize] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 0,
     height: typeof window !== 'undefined' ? window.innerHeight : 0,
   });
 
+  // Add the background styles to the document
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = backgroundStyles;
+    document.head.appendChild(styleElement);
+    
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
+
   // Save bet history to localStorage whenever it changes
   useEffect(() => {
-    console.log('Bet history changed:', betHistory);
-    localStorage.setItem('betHistory', JSON.stringify(betHistory));
-  }, [betHistory]);
+    if (!address || !betHistory.length) return;
+    
+    console.log('Saving bet history to localStorage:', betHistory);
+    
+    // Use the user's wallet address as part of the key to keep histories separate for different users
+    const storageKey = `betHistory_${address.toLowerCase()}`;
+    localStorage.setItem(storageKey, JSON.stringify(betHistory));
+  }, [betHistory, address]);
 
   // Handle hydration mismatch and load bet history
   useEffect(() => {
     setMounted(true);
     
-    // Load bet history first
-    try {
-      const savedHistory = localStorage.getItem('betHistory');
-      console.log('Loading saved history from localStorage:', savedHistory);
-      
-      if (savedHistory) {
-        const parsedHistory = JSON.parse(savedHistory);
-        console.log('Parsed history:', parsedHistory);
+    // Only load history if we have an address
+    if (address) {
+      // Load bet history first
+      try {
+        // Use the user's wallet address as part of the key
+        const storageKey = `betHistory_${address.toLowerCase()}`;
+        const savedHistory = localStorage.getItem(storageKey);
+        console.log('Loading saved history from localStorage for address:', address);
         
-        if (Array.isArray(parsedHistory)) {
-          console.log('Setting bet history from localStorage:', parsedHistory);
-          setBetHistory(parsedHistory);
+        if (savedHistory) {
+          const parsedHistory = JSON.parse(savedHistory);
+          console.log('Parsed history:', parsedHistory);
+          
+          if (Array.isArray(parsedHistory)) {
+            console.log('Setting bet history from localStorage:', parsedHistory);
+            setBetHistory(parsedHistory);
+          } else {
+            console.log('Saved history is not an array, initializing empty history');
+            setBetHistory([]);
+          }
         } else {
-          console.log('Saved history is not an array, initializing empty history');
+          console.log('No saved history found, initializing empty history');
           setBetHistory([]);
         }
-      } else {
-        console.log('No saved history found, initializing empty history');
+      } catch (error) {
+        console.error('Error loading bet history:', error);
         setBetHistory([]);
       }
-    } catch (error) {
-      console.error('Error loading bet history:', error);
-      setBetHistory([]);
     }
     
     // Reset game state on mount
@@ -203,7 +401,7 @@ export function CoinFlip() {
     // Clear any game state from localStorage
     localStorage.removeItem('lastProcessedBet');
     localStorage.removeItem('gameResult');
-  }, []);
+  }, [address]);
 
   // Get allowed bet amounts
   const { data: allowedBetAmounts } = useContractRead({
@@ -377,12 +575,13 @@ export function CoinFlip() {
 
   // Handle bet result - now only processes historical bets
   useEffect(() => {
-    if (!betDetails || gameResult || isResetting || pendingBet?.hasBet) {
+    if (!betDetails || gameResult || isResetting || pendingBet?.hasBet || !address) {
       console.log('Skipping bet details processing:', { 
         hasBetDetails: !!betDetails, 
         gameResult, 
         isResetting,
         hasPendingBet: pendingBet?.hasBet,
+        hasAddress: !!address,
         currentTime: Math.floor(Date.now() / 1000),
         lastResetTime,
         betHistory
@@ -413,20 +612,36 @@ export function CoinFlip() {
       setGameResult(playerWon ? 'win' : 'lose');
       setLastProcessedBet(placedAt);
       
+      // Convert numeric choice to boolean (false for heads, true for tails)
+      const choiceAsBool = selectedChoice === 1;
+      console.log('Using current choice for historical bet:', { selectedChoice, choiceAsBool });
+      
       // Update bet history here as well
       const newBet: BetHistoryItem = {
         result: playerWon ? 'win' : 'lose',
         amount: Number(amount) / 1e18,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        // We don't know the choice for historical bets, so we'll use the current choice as a best guess
+        choice: choiceAsBool
       };
       
       setBetHistory(prev => {
         const newHistory = [newBet, ...prev].slice(0, 10);
-        localStorage.setItem('betHistory', JSON.stringify(newHistory));
+        console.log('New bet history after update:', newHistory);
+        
+        // Save to localStorage with address-specific key
+        try {
+          const storageKey = `betHistory_${address.toLowerCase()}`;
+          localStorage.setItem(storageKey, JSON.stringify(newHistory));
+          console.log('Successfully saved bet history to localStorage for address:', address);
+        } catch (error) {
+          console.error('Error saving bet history to localStorage:', error);
+        }
+        
         return newHistory;
       });
     }
-  }, [betDetails, gameResult, pendingBet, lastProcessedBet, isResetting, lastResetTime, betHistory]);
+  }, [betDetails, gameResult, pendingBet, lastProcessedBet, isResetting, lastResetTime, betHistory, selectedChoice, address]);
 
   // Watch for bet events
   useWatchContractEvent({
@@ -447,6 +662,11 @@ export function CoinFlip() {
           [blockNumber.toString()]: betAmount
         }));
         
+        // Store the current choice for later use when the bet is settled
+        const choiceAsBool = selectedChoice === 1;
+        console.log('Storing choice for later use:', { selectedChoice, choiceAsBool });
+        setLastPlacedChoice(choiceAsBool);
+        
         setIsFlipping(false);
         setSelectedAmount(0);
         refetchPendingBet();
@@ -462,20 +682,16 @@ export function CoinFlip() {
       console.log('BetSettled event logs received:', logs);
       const [log] = logs;
       if (log && log.args.player === address) {
-        console.log('Bet settled event received for current player:', log.args);
-        const won = Boolean(log.args.won);
-        console.log('Game result from event:', won ? 'WIN' : 'LOSE');
+        console.log('Bet settled event received:', log.args);
         
-        // Clear states
-        setPendingBet(null);
-        setIsFlipping(false);
-        
-        // Set game result
-        setGameResult(won ? 'win' : 'lose');
-        
-        // Get the contract amount for reference
+        // Extract event data
         const contractAmount = Number(log.args.amount) / 1e18;
+        const won = Boolean(log.args.won);
+        
         console.log('Contract amount from event:', contractAmount);
+        console.log('Won from event:', won);
+        console.log('Current selectedChoice:', selectedChoice);
+        console.log('Last placed choice:', lastPlacedChoice);
         
         // ALWAYS use the exact UI button amounts
         let displayAmount: number;
@@ -494,11 +710,21 @@ export function CoinFlip() {
         
         console.log('Using exact UI button amount for history:', displayAmount);
         
+        // Set game result
+        setGameResult(won ? 'win' : 'lose');
+        setIsFlipping(false);
+        
+        // Use the stored choice if available, otherwise fallback to selectedChoice
+        const choiceAsBool = lastPlacedChoice !== null ? lastPlacedChoice : selectedChoice === 1;
+        console.log('Using choice for bet history:', { selectedChoice, lastPlacedChoice, choiceAsBool });
+        
+        // Create bet history item
         const newBet: BetHistoryItem = {
           result: won ? 'win' : 'lose',
           amount: displayAmount,
           timestamp: Date.now(),
-          isFree: isFree
+          isFree: isFree,
+          choice: choiceAsBool
         };
         
         setBetHistory(prev => {
@@ -506,10 +732,14 @@ export function CoinFlip() {
           const newHistory = [newBet, ...prev].slice(0, 10);
           console.log('New bet history after update:', newHistory);
           
-          // Save to localStorage
+          // Save to localStorage with address-specific key
           try {
-            localStorage.setItem('betHistory', JSON.stringify(newHistory));
-            console.log('Successfully saved bet history to localStorage');
+            // Make sure address is defined before using it
+            if (address) {
+              const storageKey = `betHistory_${address.toLowerCase()}`;
+              localStorage.setItem(storageKey, JSON.stringify(newHistory));
+              console.log('Successfully saved bet history to localStorage for address:', address);
+            }
           } catch (error) {
             console.error('Error saving bet history to localStorage:', error);
           }
@@ -520,6 +750,8 @@ export function CoinFlip() {
         // Reset state
         setCurrentBetAmount(null);
         setPendingBetAmount(null);
+        setPendingBet(null);
+        setLastPlacedChoice(null); // Clear the stored choice
       }
     },
   });
@@ -574,22 +806,37 @@ export function CoinFlip() {
       setPendingBetAmount(selectedAmount);
       console.log('Stored pending bet amount:', selectedAmount);
       
-      const result = await writeContract({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: 'placeBet',
-        args: [selectedChoice],
-        value: parseEther(selectedAmount.toString()),
-      });
-      console.log('Bet transaction submitted', result);
+      // Store the current choice for later use when the bet is settled
+      const choiceAsBool = selectedChoice === 1;
+      console.log('Storing choice for later use:', { selectedChoice, choiceAsBool });
+      setLastPlacedChoice(choiceAsBool);
       
-      // Refetch pending bet status
-      refetchPendingBet();
+      // The contract expects uint8 (0 for heads, 1 for tails)
+      // selectedChoice is already 0 or 1, so we can use it directly
+      console.log('Placing bet with choice:', selectedChoice);
+      
+      // Check if eligible for free bet and hasn't used it yet
+      if (isEligibleForFreeBet && !hasUsedFreeBet && selectedAmount === 0.25) {
+        console.log('Using free bet');
+        writeContract({
+          address: CONTRACT_ADDRESS,
+          abi: CONTRACT_ABI,
+          functionName: 'placeFreeBet',
+          args: [selectedChoice],
+        });
+      } else {
+        console.log('Using regular bet');
+        writeContract({
+          address: CONTRACT_ADDRESS,
+          abi: CONTRACT_ABI,
+          functionName: 'placeBet',
+          args: [selectedChoice],
+          value: parseEther(selectedAmount.toString()),
+        });
+      }
     } catch (error) {
       console.error('Error placing bet:', error);
       setIsFlipping(false);
-      // Clear pending bet amount on error
-      setPendingBetAmount(null);
     }
   };
 
@@ -633,6 +880,7 @@ export function CoinFlip() {
     setLastProcessedBet(null);
     setCurrentBetAmount(null);
     setPendingBetAmount(null);
+    setLastPlacedChoice(null); // Reset the stored choice
     
     try {
       // Force refetch of all contract state
@@ -663,6 +911,11 @@ export function CoinFlip() {
       setPendingBetAmount(0.25);
       console.log('Stored pending free bet amount: 0.25');
       
+      // Store the current choice for later use when the bet is settled
+      const choiceAsBool = selectedChoice === 1;
+      console.log('Storing choice for free bet:', { selectedChoice, choiceAsBool });
+      setLastPlacedChoice(choiceAsBool);
+      
       const result = await writeContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
@@ -690,7 +943,7 @@ export function CoinFlip() {
         onClick={() => setSelectedChoice(0)}
         className={`px-6 py-3 rounded-lg font-semibold transition-all ${
           selectedChoice === 0
-            ? 'bg-yellow-500 text-black'
+            ? 'bg-[#04e6e0] text-black'
             : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
         }`}
       >
@@ -700,7 +953,7 @@ export function CoinFlip() {
         onClick={() => setSelectedChoice(1)}
         className={`px-6 py-3 rounded-lg font-semibold transition-all ${
           selectedChoice === 1
-            ? 'bg-yellow-500 text-black'
+            ? 'bg-[#04e6e0] text-black'
             : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
         }`}
       >
@@ -736,8 +989,13 @@ export function CoinFlip() {
 
   if (!mounted) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
-        <div className="w-full max-w-md p-6 rounded-lg shadow-lg bg-gray-800">
+      <div className="flex flex-col items-center justify-center min-h-screen text-white p-4">
+        <div className="futuristic-background">
+          <div className="grid-lines"></div>
+          <div className="glow-circle"></div>
+          <div className="glow-circle"></div>
+        </div>
+        <div className="w-full max-w-md p-6 rounded-lg shadow-lg bg-black border border-[#04e6e0]/20">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-gray-700 rounded w-3/4 mx-auto"></div>
             <div className="space-y-2">
@@ -751,7 +1009,13 @@ export function CoinFlip() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen text-white p-4 relative">
+      <div className="futuristic-background">
+        <div className="grid-lines"></div>
+        <div className="glow-circle"></div>
+        <div className="glow-circle"></div>
+      </div>
+      
       {gameResult === 'win' && (
         <Confetti
           width={confettiConfig.width}
@@ -766,7 +1030,7 @@ export function CoinFlip() {
       <div className="w-full max-w-xl">
         <BetHistory history={betHistory} />
         
-        <div className="p-6 rounded-lg shadow-lg bg-gray-800">
+        <div className="p-6 rounded-lg shadow-lg bg-black border border-[#04e6e0]/20">
           <div className="flex justify-end mb-4">
             <ConnectButton />
           </div>
@@ -789,7 +1053,7 @@ export function CoinFlip() {
                 </h2>
                 <button
                   onClick={handlePlayAgain}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors"
+                  className="bg-[#04e6e0] hover:bg-[#04e6e0]/80 text-black font-bold py-2 px-4 rounded-full transition-colors"
                 >
                   {gameResult === 'win' ? 'Double or Nothing?' : 'Run it back?'}
                 </button>
@@ -807,7 +1071,7 @@ export function CoinFlip() {
               <button
                 onClick={handleSettle}
                 disabled={isSettleBetLoading || isFlipping}
-                className={`bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors ${
+                className={`bg-[#04e6e0] hover:bg-[#04e6e0]/80 text-black font-bold py-2 px-4 rounded-full transition-colors ${
                   (isSettleBetLoading || isFlipping) && 'opacity-50 cursor-not-allowed'
                 }`}
               >
@@ -829,7 +1093,7 @@ export function CoinFlip() {
                     onClick={() => setSelectedAmount(Number(amount) / 1e18)}
                     className={`py-3 px-4 rounded-lg font-semibold transition-all ${
                       selectedAmount === Number(amount) / 1e18
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-[#04e6e0] text-black'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                     }`}
                   >
@@ -855,7 +1119,7 @@ export function CoinFlip() {
                 className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${
                   !selectedAmount || isPlaceBetLoading || isFlipping
                     ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-[#04e6e0] hover:bg-[#04e6e0]/80 text-black'
                 }`}
               >
                 {isPlaceBetLoading || isFlipping ? 'Placing Bet...' : 'Place Bet'}
