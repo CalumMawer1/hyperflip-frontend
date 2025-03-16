@@ -225,6 +225,20 @@ const Coin = ({ isFlipping, result, selectedChoice = 0 }: { isFlipping: boolean;
     </div>
   );
   
+  // Determine which side of the coin to show based on the result
+  const showCoinSide = () => {
+    if (result === null) {
+      // If no result yet, show the selected side
+      return choiceAsBool ? <TailCoin /> : <CatCoin />;
+    } else if (result === 'win') {
+      // If player won, show the side they chose
+      return choiceAsBool ? <TailCoin /> : <CatCoin />;
+    } else if (result === 'lose') {
+      // If player lost, show the opposite side
+      return choiceAsBool ? <CatCoin /> : <TailCoin />;
+    }
+  };
+  
   return (
     <div className="relative w-32 h-32 mb-2 mx-auto">
       <motion.div
@@ -242,11 +256,7 @@ const Coin = ({ isFlipping, result, selectedChoice = 0 }: { isFlipping: boolean;
         <div className="flex flex-col items-center justify-center w-full h-full relative">
           {!isFlipping && result !== null && (
             <>
-              {choiceAsBool === false ? (
-                <CatCoin />
-              ) : (
-                <TailCoin />
-              )}
+              {showCoinSide()}
             </>
           )}
           {isFlipping && (
@@ -281,11 +291,7 @@ const Coin = ({ isFlipping, result, selectedChoice = 0 }: { isFlipping: boolean;
           )}
           {!isFlipping && result === null && (
             <>
-              {choiceAsBool === false ? (
-                <CatCoin />
-              ) : (
-                <TailCoin />
-              )}
+              {showCoinSide()}
             </>
           )}
         </div>
