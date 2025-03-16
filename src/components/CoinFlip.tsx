@@ -176,15 +176,15 @@ const BetHistory = ({ history }: { history: BetHistoryItem[] }) => {
         {history.map((bet, index) => {
           return (
             <div
-              key={index}
+              key={`bet-${bet.timestamp}-${index}`}
               className={`flex flex-col items-center p-3 rounded-lg min-w-[90px] ${
                 bet.result === 'win' ? 'bg-[#04e6e0]/10 border border-[#04e6e0]/30' : 'bg-red-600/20 border border-red-600/30'
               } ${index === 0 ? 'ml-1' : ''} ${index === history.length - 1 ? 'mr-1' : ''}`}
             >
               <div className="mb-2 h-8 flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
                   {bet.choice ? <TailCoinSVG className="w-8 h-8" /> : <CatCoinSVG className="w-8 h-8" />}
-                  </div>
+                </div>
               </div>
               <div className="flex flex-col items-center justify-center text-center">
                 <span className="text-sm font-medium text-[#04e6e0]">
@@ -741,31 +741,28 @@ export function CoinFlip() {
       setLastProcessedBet(placedAt.toString());
       
       // Convert numeric choice to boolean (false for heads, true for tails)
-      const choiceAsBool = selectedChoice === 1;
-      console.log('Using current choice for historical bet:', { selectedChoice, choiceAsBool });
+      const choiceAsBool = lastPlacedChoice !== null ? lastPlacedChoice : selectedChoice === 1;
+      console.log('Using choice for historical bet:', { selectedChoice, lastPlacedChoice, choiceAsBool });
+      
+      // Normalize the amount to match UI button amounts
+      let displayAmount = Number(amount) / 1e18;
+      if (displayAmount >= 0.24 && displayAmount < 0.26) displayAmount = 0.25;
+      else if (displayAmount >= 0.48 && displayAmount < 0.52) displayAmount = 0.5;
+      else if (displayAmount >= 0.97 && displayAmount < 1.03) displayAmount = 1;
+      else if (displayAmount >= 1.94 && displayAmount < 2.06) displayAmount = 2;
+      else displayAmount = Math.round(displayAmount);
       
       // Update bet history here as well
       const newBet: BetHistoryItem = {
         result: playerWon ? 'win' : 'lose',
-        amount: Number(amount) / 1e18,
-        timestamp: Date.now(),
+        amount: displayAmount,
+        timestamp: Date.now() + Math.random(), // Add random value to ensure uniqueness
         // We don't know the choice for historical bets, so we'll use the current choice as a best guess
         choice: choiceAsBool
       };
       
+      // Always add the new bet to history without checking for duplicates
       setBetHistory(prev => {
-        // Check if this bet is already in history to prevent duplicates
-        const isDuplicate = prev.some(bet => 
-          Math.abs(bet.amount - Number(amount) / 1e18) < 0.01 && 
-          bet.result === (playerWon ? 'win' : 'lose') &&
-          Date.now() - bet.timestamp < 60000
-        );
-        
-        if (isDuplicate) {
-          console.log('Detected duplicate bet, skipping history update');
-          return prev;
-        }
-        
         const newHistory = [newBet, ...prev].slice(0, 10);
         console.log('New bet history after update:', newHistory);
         
@@ -776,8 +773,8 @@ export function CoinFlip() {
           console.log('Successfully saved bet history to localStorage for address:', address);
           
           // Update profile data
-          updateLeaderboardData(address, Number(amount) / 1e18, playerWon);
-          console.log('Updated profile data for historical bet:', { address, amount: Number(amount) / 1e18, won: playerWon });
+          updateLeaderboardData(address, displayAmount, playerWon);
+          console.log('Updated profile data for historical bet:', { address, amount: displayAmount, won: playerWon });
         } catch (error) {
           console.error('Error saving bet history to localStorage:', error);
         }
@@ -785,7 +782,7 @@ export function CoinFlip() {
         return newHistory;
       });
     }
-  }, [betDetails, gameResult, pendingBet, lastProcessedBet, isResetting, lastResetTime, betHistory, selectedChoice, address]);
+  }, [betDetails, gameResult, pendingBet, lastProcessedBet, isResetting, lastResetTime, betHistory, selectedChoice, address, lastPlacedChoice]);
 
   // Watch for bet events
   useWatchContractEvent({
@@ -871,17 +868,20 @@ export function CoinFlip() {
           console.log('Stored pendingBetAmount in localStorage:', displayAmount);
         }
         
-        // Create bet history item
+        // Create bet history item with a unique timestamp to ensure it's always added
         const newBet: BetHistoryItem = {
           result: won ? 'win' : 'lose',
           amount: displayAmount,
-          timestamp: Date.now(),
+          timestamp: Date.now() + Math.random(), // Add random value to ensure uniqueness
           isFree: isFree,
           choice: choiceAsBool
         };
         
+        // Always add the new bet to history without checking for duplicates
         setBetHistory(prev => {
           console.log('Previous bet history:', prev);
+          
+          // Create new history with the new bet at the beginning
           const newHistory = [newBet, ...prev].slice(0, 10);
           console.log('New bet history after update:', newHistory);
           
