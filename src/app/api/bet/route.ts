@@ -116,6 +116,3 @@ export async function POST(request: Request) {
   }
 }
 
-export const config = {
-  maxDuration: 10,
-};

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 const API_BASE_URL = process.env.API_URL || 'http://localhost:8080'
 const API_KEY = process.env.API_KEY;
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -11,8 +13,7 @@ export async function GET(request: NextRequest) {
     const playerAddress = searchParams.get('player_address');
     const sortBy = searchParams.get('sort_by');
     const forceRefresh = searchParams.has('t') || searchParams.has('_debug');
-    
-    console.log(`API Route received sort_by: ${sortBy}`);
+
     
     if (!API_KEY) {
       console.error('API_KEY environment variable is not set');
