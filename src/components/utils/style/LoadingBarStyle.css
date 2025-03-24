@@ -1,0 +1,21 @@
+@keyframes loading-bar {
+    0% {
+      transform: scaleX(0);
+      opacity: 0;
+    }
+    40% {
+      transform: scaleX(1);
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+      transform: scaleY(1.25)
+    }
+}
+  
+.loading-bar-animation {
+    animation: loading-bar 1.2s ease-out forwards;
+    transform-origin: left;
+    box-shadow: 0 0 10px rgba(4, 230, 224, 0.5);
+    width: 100%;
+}

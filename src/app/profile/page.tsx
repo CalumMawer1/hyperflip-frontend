@@ -1,195 +1,278 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Link from 'next/link';
-
-type ProfileData = {
-  address: string;
-  totalBets: number;
-  totalWagered: number;
-  totalProfit: number;
-  wins: number;
-  losses: number;
-  winRate: number;
-};
+import { useEffect, useState } from 'react';
+import { CircularIndicator, StatsCard, ProfileCard } from '@/components/Profile';
+import { UserProvider, useUserProvider } from '@/providers/UserProvider';
+import Navbar from '@/components/Layout/Navbar';
+import FuturisticBackground from '@/components/Layout/FuturisticBackground';
 
 export default function ProfilePage() {
-  const { address, isConnected } = useAccount();
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  const { address } = useAccount();
 
   useEffect(() => {
-    if (!address) {
-      setIsLoading(false);
-      return;
-    }
+    setMounted(true);
+  }, []);
 
-    try {
-      const PROFILE_STORAGE_KEY = `hyperflip_profile_${address.toLowerCase()}`;
-      const storedData = localStorage.getItem(PROFILE_STORAGE_KEY);
-      
-      if (storedData) {
-        const parsedData = JSON.parse(storedData);
-        setProfileData(parsedData);
-        console.log('Loaded profile data:', parsedData);
-      } else {
-        // Initialize with empty profile
-        const emptyProfile = {
-          address: address.toLowerCase(),
-          totalBets: 0,
-          totalWagered: 0,
-          totalProfit: 0,
-          wins: 0,
-          losses: 0,
-          winRate: 0
-        };
-        setProfileData(emptyProfile);
-        console.log('No profile data found, using empty profile');
-      }
-    } catch (error) {
-      console.error('Error loading profile data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [address]);
+  const formatTimeSince = (timestamp: number | null) => {
+    if (!timestamp) return "never";
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+    if (seconds < 60) return `${seconds} seconds ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days !== 1 ? 's' : ''} ago`;
+  };
 
-  return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-[#04e6e0]/20">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-6">
-            <Link href="/" className="logo-text text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#04e6e0] to-[#03a8a3] drop-shadow-[0_0_10px_rgba(4,230,224,0.3)]">
-              HyperFlip
-            </Link>
-          </div>
-          <div>
-            <ConnectButton />
+  // Format address for display
+  const formatAddress = (address: string | undefined) => {
+    if (!address) return '';
+    return `${address.substring(0, 8)}...${address.substring(address.length - 6)}`;
+  };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-background-dark text-white">
+        <div className="fixed top-0 left-0 right-0 z-50 bg-background-dark/80 backdrop-blur-md border-b border-primary-dark">
+          <div className="w-full px-16 py-4 flex justify-between items-center">
+            <div className="flex items-center space-x-6">
+              <div className="h-8 w-28 bg-primary-light rounded"></div>
+            </div>
+            <div className="h-10 w-32 bg-primary-light rounded"></div>
           </div>
         </div>
+        <div className="pt-24 pb-12 px-4 max-w-4xl mx-auto relative">
+          <div className="flex items-center justify-center mb-8">
+            <div className="h-10 w-56 bg-primary-light rounded"></div>
+          </div>
+          <div className="bg-background-dark/30 rounded-xl h-96"></div>
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <UserProvider initialAddress={address}>
+      <ProfileContent 
+        formatTimeSince={formatTimeSince} 
+        formatAddress={formatAddress} 
+      />
+    </UserProvider>
+  );
+}
+
+function ProfileContent({ formatTimeSince, formatAddress }: { 
+  formatTimeSince: (timestamp: number | null) => string; 
+  formatAddress: (address: string | undefined) => string;
+}) {
+  const { 
+    walletAddress: address,
+    numBets: totalBets,
+    numWins: wins,
+    numLosses: losses,
+    netGain: totalProfit,
+    totalWagered,
+    winPercentage,
+    numPoints,
+    isLoading: loading,
+    lastRefreshed,
+    refreshUserData,
+    isRefreshNeeded,
+  } = useUserProvider();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Profile data:', {
+      address,
+      totalBets,
+      wins,
+      losses,
+      totalProfit,
+      totalWagered,
+      winPercentage,
+      numPoints,
+      loading,
+      lastRefreshed
+    });
+  }, [address, totalBets, wins, losses, totalProfit, totalWagered, winPercentage, numPoints, loading, lastRefreshed]);
+
+  useEffect(() => {
+    if (address) {
+      refreshUserData(true);
+    }
+  }, [address, refreshUserData]);
+  
+  const displayTotalWagered = totalWagered || 0;
+
+  const displayWinRate = winPercentage !== undefined 
+    ? Math.round(winPercentage * 100) 
+    : (totalBets && totalBets > 0 ? Math.round((wins || 0) / totalBets * 100) : 0);
+  
+  // const renderLastUpdated = () => {
+  //   if (typeof window === 'undefined' || !lastRefreshed) return null;
+    
+  //   const formattedTime = formatTimeSince(lastRefreshed);
+    
+  //   return (
+  //     <div className="text-sm text-gray-400 mt-1 sm:mt-0 flex items-center justify-end">
+  //       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  //         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  //       </svg>
+  //       Updated: {formattedTime}
+  //       <button 
+  //         onClick={() => refreshUserData(true)}
+  //         className={`ml-2 text-primary hover:text-primary/80 transition-colors ${isRefreshNeeded ? 'animate-pulse' : ''}`}
+  //         title={isRefreshNeeded ? "Update available" : "Check for updates"}
+  //         disabled={loading}
+  //       >
+  //         <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  //           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  //         </svg>
+  //       </button>
+  //     </div>
+  //   );
+  // };
+
+  return (
+    <FuturisticBackground>
+      <Navbar />
 
       {/* Main Content */}
-      <div className="pt-24 pb-12 px-4 max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-[#04e6e0] mb-8 text-center">Your Profile</h1>
-
-        {!isConnected ? (
-          <div className="bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg text-center">
-            <p className="text-xl mb-4">Connect your wallet to view your profile</p>
-            <div className="flex justify-center">
-              <ConnectButton />
+      <div className="pt-24 pb-12 px-4 max-w-4xl mx-auto relative z-10">
+        <div className="flex justify-between items-center mb-4 mt-8">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gradient-primary tracking-wider flex items-center">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              className="h-8 w-8 mr-3 text-primary" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" 
+              />
+            </svg>
+            PROFILE
+          </h1>
+          <Link 
+            href="/" 
+            className="text-primary bg-primary-light hover:bg-primary-medium px-4 py-2 rounded-md border border-primary-dark transition-all duration-300 flex items-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
+            </svg>
+            Back to Game
+          </Link>
+        </div>
+        
+        {!address ? (
+          <div className="card-glow p-8 text-center">
+            <div className="inline-block p-4 rounded-full bg-primary-light mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
             </div>
-          </div>
-        ) : isLoading ? (
-          <div className="bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg">
-            <div className="animate-pulse space-y-4">
-              <div className="h-8 bg-gray-700 rounded w-1/4 mx-auto"></div>
-              <div className="space-y-2">
-                <div className="h-4 bg-gray-700 rounded"></div>
-                <div className="h-4 bg-gray-700 rounded w-5/6"></div>
-              </div>
-            </div>
-          </div>
-        ) : profileData ? (
-          <div className="bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-black/50 border border-[#04e6e0]/10 p-4 rounded-lg">
-                <h2 className="text-xl font-semibold text-[#04e6e0] mb-2">Betting Stats</h2>
-                <div className="space-y-2">
-                  <p className="flex justify-between">
-                    <span className="text-gray-400">Total Bets:</span>
-                    <span className="font-medium">{profileData.totalBets}</span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="text-gray-400">Total Wagered:</span>
-                    <span className="font-medium">{profileData.totalWagered.toFixed(2)} HYPE</span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="text-gray-400">Win/Loss Record:</span>
-                    <span className="font-medium">{profileData.wins}W - {profileData.losses}L</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-black/50 border border-[#04e6e0]/10 p-4 rounded-lg">
-                <h2 className="text-xl font-semibold text-[#04e6e0] mb-2">Performance</h2>
-                <div className="space-y-2">
-                  <p className="flex justify-between">
-                    <span className="text-gray-400">Win Rate:</span>
-                    <span className="font-medium">{profileData.winRate}%</span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="text-gray-400">Total Profit/Loss:</span>
-                    <span className={`font-medium ${profileData.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {profileData.totalProfit >= 0 ? '+' : ''}{profileData.totalProfit.toFixed(2)} HYPE
-                    </span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="text-gray-400">ROI:</span>
-                    <span className={`font-medium ${profileData.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {profileData.totalWagered > 0 
-                        ? `${((profileData.totalProfit / profileData.totalWagered) * 100).toFixed(2)}%` 
-                        : '0.00%'}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 bg-black/50 border border-[#04e6e0]/10 p-4 rounded-lg">
-              <h2 className="text-xl font-semibold text-[#04e6e0] mb-4">Betting History</h2>
-              {profileData.totalBets > 0 ? (
-                <div className="overflow-x-auto">
-                  <p className="text-center text-gray-400">
-                    You've placed {profileData.totalBets} bets with a win rate of {profileData.winRate}%.
-                    <br />
-                    Check the main page to see your recent bet history.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-center text-gray-400">You haven't placed any bets yet. Head back to the main page to start flipping!</p>
-              )}
-            </div>
-
-            <div className="mt-6 text-center">
-              <Link 
-                href="/" 
-                className="inline-block px-6 py-3 bg-[#04e6e0] text-black rounded-lg font-bold hover:bg-[#04e6e0]/80 transition-all"
-                onClick={() => {
-                  // COMPLETE RESET: Clear ALL game state in localStorage
-                  localStorage.removeItem('gameState');
-                  localStorage.removeItem('gameResult');
-                  localStorage.removeItem('lastProcessedBet');
-                  localStorage.removeItem('pendingBetAmount');
-                  
-                  // Clear any other game-related state
-                  localStorage.removeItem('currentBetAmount');
-                  
-                  // Set a flag with timestamp to force a complete reset
-                  const timestamp = Date.now();
-                  sessionStorage.setItem('force_reset', 'true');
-                  sessionStorage.setItem('reset_timestamp', timestamp.toString());
-                  console.log('Set force_reset flag with timestamp:', timestamp);
-                }}
-              >
-                Back to Flipping
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-black/80 border border-[#04e6e0]/20 p-6 rounded-lg text-center">
-            <p className="text-xl mb-4">No profile data found</p>
+            <p className="text-xl mb-6 text-primary">No profile data found</p>
             <Link 
               href="/" 
-              className="inline-block px-6 py-3 bg-[#04e6e0] text-black rounded-lg font-bold hover:bg-[#04e6e0]/80 transition-all"
+              className="inline-block px-6 py-3 bg-gradient-primary text-black rounded-lg font-bold hover:shadow-glow-lg transition-all transform hover:-translate-y-0.5"
             >
               Start Flipping
             </Link>
           </div>
+        ) : (
+          <div className="space-y-6">
+            <ProfileCard 
+              title={
+                <div className="w-full flex flex-start">
+                  <div className="w-8 h-8 rounded-full bg-primary-light border border-primary-dark flex items-center justify-center mr-3">
+                    <span className="text-primary text-sm">ID</span>
+                  </div>
+                  <h2 className="text-xl font-semibold text-white">
+                    <span className="font-mono text-sm text-primary">{address}</span>
+                  </h2>
+                </div>
+              }
+              headerContent={<></>
+                // <div className="flex-col w-full justify-end items-center">
+                //   {renderLastUpdated()}
+                // </div>
+              }
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatsCard title="Total Bets">
+                  <span className="text-2xl font-bold text-white">{totalBets || 0}</span>
+                  <div className="flex space-x-2">
+                    <div className="flex flex-col items-center">
+                      <span className="text-xs text-gray-400">Wins</span>
+                      <span className="text-success font-bold">{wins || 0}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-xs text-gray-400">Losses</span>
+                      <span className="text-error font-bold">{losses || 0}</span>
+                    </div>
+                  </div>
+                </StatsCard>
+                
+                <StatsCard title="Win Rate">
+                  <span className="text-2xl font-bold text-white">{displayWinRate}%</span>
+                  <CircularIndicator percentage={displayWinRate} />
+                </StatsCard>
+                
+                <StatsCard title="Total Wagered">
+                  <span className="text-2xl font-bold text-primary">{displayTotalWagered.toFixed(2)} HYPE</span>
+                </StatsCard>
+              </div>
+              
+              <div className="mt-4 bg-background-dark/40 p-5 rounded-lg border border-primary-light hover:border-primary-dark transition-all duration-300 hover:shadow-glow">
+                <div className="flex justify-between mb-2">
+                  <div className="text-gray-400 text-sm">Profit & Loss</div>
+                  <div className={`text-lg font-bold ${totalProfit && totalProfit >= 0 ? 'text-success' : 'text-error'}`}>
+                    {totalProfit && totalProfit >= 0 ? '+' : ''}{totalProfit?.toFixed(2)} HYPE
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="text-gray-400 text-xs">ROI:</div>
+                  <div className={`text-sm font-medium ${totalProfit && totalProfit >= 0 ? 'text-success' : 'text-error'}`}>
+                    {displayTotalWagered > 0 
+                      ? `${((totalProfit || 0) / displayTotalWagered * 100).toFixed(2)}%` 
+                      : '0.00%'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 bg-background-dark/40 p-5 rounded-lg border border-primary-light hover:border-primary-dark transition-all duration-300 hover:shadow-glow">
+                <div className="flex justify-between items-center">
+                  <div className="text-gray-400 text-sm">Total Points</div>
+                  <div className="text-lg font-bold text-primary">
+                    {numPoints || 0} pts
+                  </div>
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  You earn 100 points for each bet you complete
+                </div>
+              </div>
+            </ProfileCard>
+
+            <div className="bg-background-dark/50 border border-primary-light p-4 rounded-lg backdrop-blur-sm">
+              <div className="flex items-start">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-gray-400">May take a couple minutes for your profile to update. Visit the <Link href="/leaderboard" className="text-primary hover:underline">leaderboard</Link> to see how you rank against other players!</p>
+              </div>
+            </div>
+          </div>
         )}
       </div>
-    </div>
+    </FuturisticBackground>
   );
-} 
+}
+

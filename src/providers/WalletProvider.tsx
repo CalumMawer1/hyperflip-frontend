@@ -7,7 +7,7 @@ import {
   connectorsForWallets,
 } from '@rainbow-me/rainbowkit';
 import { ReactNode } from 'react';
-import { createConfig, WagmiConfig } from 'wagmi';
+import { createConfig, WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http } from 'viem';
 import { hyperEVM } from '../config/chains';
@@ -36,13 +36,13 @@ const queryClient = new QueryClient();
 
 function WalletProviderComponent({ children }: { children: ReactNode }) {
   return (
-    <WagmiConfig config={config}>
+    <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider modalSize="compact">
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>
-    </WagmiConfig>
+    </WagmiProvider>
   );
 }
 

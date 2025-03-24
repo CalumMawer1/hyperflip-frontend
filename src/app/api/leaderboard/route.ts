@@ -1,63 +1,70 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-// Dummy data for initial state
-const initialData = [
-  {
-    address: '0x5de0c18ad34e2895aa6b7088e4e42305909d409d',
-    totalBets: 14,
-    totalWagered: 3.3775,
-    totalProfit: -2.895,
-    wins: 1,
-    losses: 13,
-    winRate: 7
-  },
-  {
-    address: '0x80dd007cf9f0e7231dbec52e39c28a74a804c69c',
-    totalBets: 7,
-    totalWagered: 1.68875,
-    totalProfit: 1.68875,
-    wins: 7,
-    losses: 0,
-    winRate: 100
-  }
-];
+const API_BASE_URL = process.env.API_URL || 'http://localhost:8080'
+const API_KEY = process.env.API_KEY;
 
-// Get leaderboard data
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // In production, return the initial data
-    // This is just a placeholder - in a real app, you would use a database
-    return NextResponse.json(initialData);
-  } catch (error) {
-    console.error('Error reading leaderboard data:', error);
-    return NextResponse.json({ error: 'Failed to fetch leaderboard data' }, { status: 500 });
-  }
-}
-
-// Update specific player stats
-export async function PUT(request: Request) {
-  try {
-    // Get update data from request
-    const { address, betAmount, playerWon } = await request.json();
-    console.log('PUT: Received update data:', { address, betAmount, playerWon });
+    const searchParams = request.nextUrl.searchParams;
+    const page = searchParams.get('page');
+    const limit = searchParams.get('limit');
+    const playerAddress = searchParams.get('player_address');
+    const sortBy = searchParams.get('sort_by');
+    const forceRefresh = searchParams.has('t') || searchParams.has('_debug');
     
-    if (!address) {
-      return NextResponse.json({ error: 'Address is required' }, { status: 400 });
+    console.log(`API Route received sort_by: ${sortBy}`);
+    
+    if (!API_KEY) {
+      console.error('API_KEY environment variable is not set');
+      return NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      );
     }
     
-    // In a real app, you would update a database here
-    // For now, just return success with the data that was sent
-    return NextResponse.json({ 
-      success: true, 
-      message: 'In production, please use the client-side leaderboard implementation',
-      playerData: {
-        address,
-        betAmount,
-        playerWon
-      }
+    let apiUrl = `${API_BASE_URL}/leaderboard?page=${page}&limit=${limit}`;
+    if (playerAddress) {
+      apiUrl += `&player_address=${playerAddress}`;
+    }
+    
+    if (sortBy && (sortBy === 'net_gain' || sortBy === 'total_bets')) {
+      apiUrl += `&sort_by=${sortBy}`;
+      console.log(`Adding sort_by=${sortBy} to API URL`);
+    }
+    
+    if (forceRefresh) {
+      apiUrl += `&_t=${Date.now()}`;
+    }
+
+    console.log(`Calling backend API with URL: ${apiUrl}`);
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${API_KEY}`
+      },
+      cache: forceRefresh ? 'no-store' : 'no-cache'
     });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    const responseData = NextResponse.json(data);
+    
+    // Always set cache control to no-cache to prevent caching issues with sort parameter
+    responseData.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    responseData.headers.set('Pragma', 'no-cache');
+    responseData.headers.set('Expires', '0');
+    
+    return responseData;
   } catch (error) {
-    console.error('Error updating player stats:', error);
-    return NextResponse.json({ error: 'Failed to update player stats' }, { status: 500 });
+    console.error('Leaderboard API error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch leaderboard data' },
+      { status: 500 }
+    );
   }
-} 
+}
