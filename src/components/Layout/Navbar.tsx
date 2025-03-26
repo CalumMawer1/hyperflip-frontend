@@ -5,6 +5,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import TextMark from '@/components/Icons/TextMark';
 import { useUserProvider } from '@/providers/UserProvider';
 import LoadingBar from '../utils/LoadingBar';
+import { useRouter } from 'next/router';
 
 function numberWithCommas(x: number | undefined) {
   if (!x) return x;
@@ -21,6 +22,9 @@ function UserPoints() {
   
   if (!mounted) return null;
   
+  // Only show loading indicator if we have no data yet
+  const showLoadingIndicator = isLoading && numPoints === undefined;
+  
   return (
     <div className="inline-flex items-center px-3 py-2 rounded-full transition-all duration-300 hover:bg-[#04e6e0]/10 hover:shadow-glow group mr-4">
       <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#04e6e0]/10 to-[#8B5CF6]/10 flex items-center justify-center group-hover:from-[#04e6e0]/20 group-hover:to-[#8B5CF6]/20 transition-all duration-300">
@@ -33,8 +37,8 @@ function UserPoints() {
       </div>
       <div className="ml-2 flex items-center">
         <span className="text-[#04e6e0] text-sm font-medium">Points:</span>
-        {isLoading ? (
-          <span className="text-white font-bold ml-1.5 animate-pulse">Loading...</span>
+        {showLoadingIndicator ? (
+          <div className="ml-2 w-2 h-2 rounded-full bg-[#04e6e0] animate-pulse shadow-[0_0_8px_rgba(4,230,224,0.7)]"></div>
         ) : (
           <span className="text-white font-bold ml-1.5 group-hover:text-[#04e6e0] transition-colors">{numberWithCommas(numPoints) || 0}</span>
         )}
@@ -56,9 +60,11 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 
 export default function Navbar() {
   const [mounted, setMounted] = useState(false);
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const [isScrolled, setIsScrolled] = useState(false);
   const connectButtonRef = useMemo(() => <ConnectButton />, []);
+
+  const {refreshUserData} = useUserProvider();
 
   useEffect(() => {
     setMounted(true);
@@ -71,11 +77,18 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  return (
-    <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+  useEffect(() => {
+    if (mounted && address) {
+      refreshUserData(true);
+    }
+  }, [mounted, address, refreshUserData]);
+
+  // Basic navbar structure for SSR
+  const navbarContent = (
+    <div className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-[rgb(15, 26, 31)]/50 ${
       isScrolled 
-        ? 'bg-black/70 backdrop-blur-lg border-b border-[#04e6e0]/20 shadow-lg shadow-black/20' 
-        : 'bg-black/50 backdrop-blur-md border-b border-[#04e6e0]/10'
+        ? 'backdrop-blur-lg border-b border-[#04e6e0]/20 shadow-lg shadow-black/20' 
+        : 'backdrop-blur-md border-b border-[#04e6e0]/10'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
         <div className="flex items-center">
@@ -92,7 +105,7 @@ export default function Navbar() {
         <div className="flex items-center space-x-2">
           {mounted && isConnected && <UserPoints />}
           <div className="scale-90 origin-right">
-            {connectButtonRef}
+            {mounted ? connectButtonRef : <div className="h-10 w-36"></div>}
           </div>
         </div>
       </div>
@@ -106,4 +119,6 @@ export default function Navbar() {
       <LoadingBar />
     </div>
   );
+
+  return navbarContent;
 }

@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useAccount } from 'wagmi';
 import DiamondTrophySVG from '@/components/Icons/DiamondTrophySVG';
 import { LeaderboardContent } from '@/components/Leaderboard';
-import { UserProvider } from '@/providers/UserProvider';
 
 
 const LoadingFallback = () => {  
@@ -34,18 +33,10 @@ const LoadingFallback = () => {
 };
 
 export default function LeaderboardPage() {
-  const [mounted, setMounted] = useState(false);
-  const { address } = useAccount();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   return (
     <Suspense fallback={<LoadingFallback />}>
-      <UserProvider initialAddress={address}>
         <LeaderboardContent />
-      </UserProvider>
     </Suspense>
   );
 }

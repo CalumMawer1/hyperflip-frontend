@@ -3,10 +3,8 @@ import "./style/scrollbar.css"
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { GameProvider, useGame } from '../../providers/GameProvider';
-import { UserProvider, useUserProvider } from '../../providers/UserProvider';
 import BettingView from './BettingView';
-import RevealingView from './RevealView';
-import ResultView from './ResultView';
+import CombinedFlipView from './CombinedFlipView';
 import BetHistory from './BetHistory';
 import FreeBetModal from './FreeBetModal';
 import ConfettiComponent from './ConfettiComponent';
@@ -49,13 +47,10 @@ function GameView() {
   
   switch (currentView) {
     case 'result':
-      return <ResultView />;
-
     case 'revealing':
-      return <RevealingView />;
+      return <CombinedFlipView />;
 
     case 'betting':
-
     default:
       return <BettingView />;
   }
@@ -71,7 +66,6 @@ function NewCoinFlip() {
   }, []);
 
   return (
-    <UserProvider initialAddress={address}>
       <GameProvider address={address} isConnected={isConnected}>
         <FuturisticBackground>
           {mounted && <StatusToast />}
@@ -88,7 +82,7 @@ function NewCoinFlip() {
               <div className="relative w-full h-[calc(100vh-7rem)]">
                 
                 {/* GameView */}
-                <div className="w-full max-w-7xl mx-auto px-4 h-full flex justify-center items-center">
+                <div className="w-full max-w-7xl mx-auto px-4 h-full flex justify-center items-start pt-20">
                   {mounted && <GameView />}
                 </div>
                 
@@ -102,7 +96,6 @@ function NewCoinFlip() {
           </div>
         </FuturisticBackground>
       </GameProvider>
-    </UserProvider>
   );
 }
 

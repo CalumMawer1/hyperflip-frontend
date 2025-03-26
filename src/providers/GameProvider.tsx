@@ -6,7 +6,6 @@ import { useWaitForTransactionReceipt } from 'wagmi';
 
 const STORAGE_KEY = 'recorded_bets';
 
-// Move the localStorage functions to a separate utility file
 export function getRecordedBets() {
     if (typeof window === 'undefined') return new Set();
     try {
@@ -48,11 +47,10 @@ export function getRecordedBets() {
     return displayAmount;
   }
 
-// Define types for the context value
 interface GameContextType {
   currentView: string;
-  selectedChoice: number;
-  selectedAmount: number;
+  selectedChoice: number | null;
+  selectedAmount: number | null;
   isFlipping: boolean;
   gameResult: string | null;
   showFreeBetModal: boolean;
@@ -89,7 +87,7 @@ interface GameContextType {
   // computed values
   pendingBetAmount: number;
   getTransactionStatusText: () => string | null;
-  betTxHash?: Address;
+  betTxHash?: `0x${string}` | null;
   
 }
 
@@ -101,22 +99,18 @@ interface GameProviderProps {
   isConnected: boolean;
 }
 
+
 export function GameProvider({ children, address, isConnected }: GameProviderProps) {
-  // ####################### STATE DEFINITIONS #######################
-  // UI state
   const [currentView, setCurrentView] = useState('betting');
-  const [selectedChoice, setSelectedChoice] = useState(0);
-  const [selectedAmount, setSelectedAmount] = useState(0);
+  const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
+  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [isFlipping, setIsFlipping] = useState(false);
   const [gameResult, setGameResult] = useState<string | null>(null);
   const [showFreeBetModal, setShowFreeBetModal] = useState(true);
   
-  // Transaction state
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [isRecordingBet, setIsRecordingBet] = useState(false);
   const lastRecordedBetRef = useRef<string | null>(null);
  
-  // ####################### CONTRACT HANDLER SETUP #######################
   const {
     allowedBetAmounts,
     pendingBet,
@@ -146,13 +140,13 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
     settleIsRejected
   } = useContractHandler(address as Address, isConnected);
 
-  const { data: receipt, error: receiptError, isLoading: isReceiptLoading } =
-    useWaitForTransactionReceipt({
-      hash: txHash as `0x${string}` | undefined,
-      query: {
-        enabled: Boolean(txHash),
-      }
-    });
+
+  const { data: receipt, error: receiptError, isLoading: isReceiptLoading } = useWaitForTransactionReceipt({
+    hash: txHash as `0x${string}` | undefined,
+    query: {
+      enabled: Boolean(txHash),
+    }
+  });
 
   // ####################### TRANSACTION TRACKING #######################
   useEffect(() => {
@@ -167,6 +161,7 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
     if (settleTxHash) {
       setTxHash(settleTxHash);
       setLastTxType('settle');
+      setIsFlipping(false);
     }
   }, [settleTxHash]);
 
@@ -183,7 +178,7 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
     if (receipt) {
       refetchBetDetails();
       refetchPendingBet();
-      // Clear txHash so this effect doesn't repeatedly run
+      // clear txHash so this effect doesn't repeatedly run
       setTxHash(null);
     }
     if (receiptError) {
@@ -202,7 +197,7 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
 
   // local wrapper to place a bet
   const onPlaceBet = async () => {
-    if (!isConnected || selectedAmount <= 0) {
+    if (!isConnected || (selectedAmount && selectedAmount <= 0)) {
       console.error('No bet amount selected or wallet not connected');
       return;
     }
@@ -210,7 +205,14 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
     setGameResult(null); 
 
     try {
-      await placeBet(selectedChoice, selectedAmount.toString());
+      console.log('Attempting to place bet with:', { selectedChoice, selectedAmount });
+      if (selectedChoice !== null && selectedAmount !== null){
+        await placeBet(selectedChoice, selectedAmount.toString());
+      }else {
+        setCurrentView("betting");
+        setIsFlipping(false)
+        console.error("must select a side before placing a bet and an amount", { selectedChoice, selectedAmount });
+      }
       // wait for confirmation before changing view
     } catch (error) {
       console.error("Error placing bet:", error);
@@ -232,8 +234,8 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
       console.error('No pending bet to settle or wallet not connected');
       return;
     }
+    console.log("settling revealing results")
     setIsFlipping(true);
-    setGameResult(null);
     try {
       await handleSettle();
       setLastTxType('settle');
@@ -248,19 +250,13 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
   useEffect(() => {
     if (settleIsRejected) {
       setIsFlipping(false);
-      
-      // Don't change currentView - keep them in revealing
       console.log('Settlement rejected - user can try again');
     }
   }, [settleIsRejected]);
 
-  // update game result after settling
+  // update game result and view after settling
   useEffect(() => {
-    // Only update game result if:
-      // 1. The bet is settled
-      // 2. not currently flipping the coin (still processing)
-      // 3. The last transaction was a settlement transaction
-    if (betDetails && betDetails.isSettled && !isFlipping && lastTxType === 'settle') {
+    if (betDetails && betDetails.isSettled && lastTxType === 'settle') {
       const result = betDetails.playerWon ? "win" : "lose";
       setGameResult(result);
     }
@@ -287,10 +283,6 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
       return;
     }
     
-    console.log('CLAIMING FREE BET: Choice:', selectedChoice === 0 ? 'Heads' : 'Tails');
-    console.log('Current whitelist status:', isWhitelisted);
-    console.log('Has used free bet status:', hasUsedFreeBet);
-    
     setIsFlipping(true);
     try {
       await refetchIsWhitelisted(); // refresh right before attempting
@@ -299,14 +291,16 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
         throw new Error('Not currently whitelisted for free bet');
       }
       
-       await handleFreeBet(selectedChoice);
+      if (selectedChoice === null) {
+        throw new Error('No choice selected');
+      }
+      
+      await handleFreeBet(selectedChoice);
       
       setLastTxType('freeBet');
     } catch (error: any) {
-      // Detect specific errors related to whitelist
       if (error.message?.includes('whitelist') || error.message?.includes('Whitelist')) {
         console.error("Free bet whitelist error:", error);
-        // Maybe show specific message to user about whitelist issue
       } else {
         console.error("Error placing free bet:", error);
       }
@@ -341,7 +335,8 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
   // reset game state
   const onPlayAgain = () => {
     setGameResult(null);
-    setSelectedAmount(0);
+    setSelectedAmount(null);
+    setSelectedChoice(null);
     setIsFlipping(false);
     setCurrentView('betting'); 
   };
@@ -360,16 +355,8 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
     }
   }, [pendingBet, betDetails, betTxHash, currentView]);
 
-  // update gameResult and view after settling
-  useEffect(() => {
-    if (betDetails && betDetails.isSettled && !isFlipping && lastTxType === 'settle') {
-      const result = betDetails.playerWon ? "win" : "lose";
-      setGameResult(result);
-      setCurrentView('result');
-    }
-  }, [betDetails, isFlipping, lastTxType]);
-
   // ############################################### DATA FETCHING #########################################3########
+  
   useEffect(() => {
     if (isConnected && address) {
       refetchIsWhitelisted();
@@ -378,39 +365,37 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
       refetchPendingBet();
       refetchBetDetails();
     }
-  }, [
-    isConnected,
-    address,
-    refetchIsWhitelisted,
-    refetchHasUsedFreeBet,
-    refetchBetAmounts,
-    refetchPendingBet,
-    refetchBetDetails,
-  ]);
+  }, [isConnected, address, refetchIsWhitelisted, refetchHasUsedFreeBet, refetchBetAmounts, refetchPendingBet, refetchBetDetails]);
 
   // ####################### BET RECORDING #######################
-  // Monitor betDetails for completed bets to record in DB
+  // Use a ref to track if recording is in progress
+  const isRecordingInProgressRef = useRef(false);
+
+  // Keep only this useEffect that records settled bets
   useEffect(() => {
-    if (betDetails && betDetails.isSettled && !isRecordingBet && lastTxType === 'settle') {
+    if (betDetails && betDetails.isSettled && lastTxType === 'settle' && !isRecordingInProgressRef.current) {
       const betId = `${address?.toLowerCase()}_${betDetails.placedAt.toString()}`;
       
-      // skip if bet already recorded
       if (isBetRecorded(betId) || lastRecordedBetRef.current === betId) {
-        console.log('🔍 Bet already recorded, skipping DB update:', betId);
         return;
       }
       
-      setIsRecordingBet(true);
-      lastRecordedBetRef.current = betId;
+      isRecordingInProgressRef.current = true; // Use ref instead of state
       
-      const recordBetInDB = async () => {
+      const recordSettledBet = async () => {
         try {
           let validAmount = roundBet(betDetails.amount);
           
           if (!validAmount) {
-            console.error('Invalid bet amount');
+            console.error('Invalid bet amount for settled bet');
             return;
           }
+          
+          console.log('Recording settled bet:', {
+            player_address: address,
+            wager_amount: validAmount,
+            is_win: betDetails.playerWon,
+          });
           
           const response = await fetch('/api/bet', {
             method: 'POST',
@@ -424,22 +409,23 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
           });
           
           if (!response.ok) {
-            throw new Error('Failed to record bet');
+            throw new Error('Failed to record settled bet');
           }
           
           await response.json();
           recordBet(betId);
+          console.log('Settled bet recorded successfully:', betId);
 
         } catch (error) {
-          //console.error('Error recording bet:', error);
-        } finally {
-          setIsRecordingBet(false);
+          console.error('Error recording settled bet:', error);
         }
       };
 
-      recordBetInDB();
+      recordSettledBet().finally(() => {
+        isRecordingInProgressRef.current = false;
+      });
     }
-  }, [betDetails, address, isRecordingBet, lastTxType]);
+  }, [betDetails, address, lastTxType]);
 
   // #####################3############### COMPUTED VALUES ###########################################
   // get the pending bet amount for display
@@ -461,6 +447,11 @@ export function GameProvider({ children, address, isConnected }: GameProviderPro
     if (isFreeBetPending) return "Free bet transaction pending in wallet...";
     return null;
   };
+
+  // Add logging for selectedChoice changes
+  useEffect(() => {
+    console.log("selectedChoice changed to:", selectedChoice);
+  }, [selectedChoice]);
 
   const value: GameContextType = {
     // State

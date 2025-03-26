@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const API_BASE_URL = process.env.API_URL || 'http://localhost:8080';
 const API_KEY = process.env.API_KEY;
 
@@ -26,12 +29,11 @@ export async function GET(
         { status: 500 }
       );
     }
-
-    // Get If-None-Match header for conditional requests
-    const ifNoneMatch = request.headers.get('If-None-Match');
     
     const url = new URL(`${API_BASE_URL}/player`);
     url.searchParams.append('player_address', walletAddress);
+    // Add timestamp to prevent caching
+    url.searchParams.append('_t', Date.now().toString());
     
     console.log("fetching:", url.toString())
     const fetchOptions: RequestInit = {
@@ -39,23 +41,13 @@ export async function GET(
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_KEY}`
-      }
+      },
+      cache: 'no-store'
     };
     
-    // Add If-None-Match header for conditional requests to the backend
-    if (ifNoneMatch) {
-      fetchOptions.headers = {
-        ...fetchOptions.headers,
-        'If-None-Match': ifNoneMatch
-      };
-    }
     
     const response = await fetch(url.toString(), fetchOptions);
-    
-    if (response.status === 304) {
-      // for cacheing
-      return new Response(null, { status: 304 });
-    }
+
     
     if (!response.ok) {
       if (response.status === 404) {
@@ -78,6 +70,7 @@ export async function GET(
     }
 
     const data = await response.json();
+    // console.log("raw user data", data)
         
     const transformedData = {
       totalBets: (data.player?.wins || 0) + (data.player?.losses || 0),
@@ -90,15 +83,13 @@ export async function GET(
       playerRankByTotalBets: data.rank_by_total_bets || null
     };
     
-    
+    // console.log('transformed data', transformedData)
     const responseData = NextResponse.json(transformedData);
     
-    // Generate ETag based on data for conditional requests
-    const etag = `W/"${Buffer.from(JSON.stringify(transformedData)).toString('base64')}"`;
-    
-    // cache for 5 minutes
-    responseData.headers.set('Cache-Control', 'public, max-age=120, s-maxage=120');
-    responseData.headers.set('ETag', etag);
+    // prevent caching
+    responseData.headers.set('Cache-Control', 'no-store, max-age=0');
+    responseData.headers.set('Pragma', 'no-cache');
+    responseData.headers.set('Expires', '0');
     
     return responseData;
   } catch (error) {

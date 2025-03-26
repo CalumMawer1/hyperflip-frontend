@@ -5,11 +5,12 @@ import { headers } from 'next/headers';
 interface BetRequest {
   player_address: string;
   wager_amount: number;
-  is_win: boolean;
+  is_win: boolean | null;
+  placed_at?: string;
 }
 
 const validBetSizes = [0.0, 0.25, 0.5, 1, 2];
-const API_BASE_URL = process.env.NODE_ENV == "production" ? process.env.API_URL : 'http://localhost:8080';
+const API_BASE_URL = "http:localhost:8080";
 const API_KEY = process.env.API_KEY;
 
 export async function POST(request: Request) {
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
         { status: 413 }
       );
     }
+    console.log("placing bet request at url", API_BASE_URL)
 
     const betRequest: BetRequest = await request.json();
 
@@ -46,10 +48,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (typeof betRequest.is_win !== 'boolean') {
-      console.log("is win isn't a boolean")
+    if (typeof betRequest.is_win !== 'boolean' && betRequest.is_win !== null) {
+      console.log("is_win isn't a boolean or null", typeof betRequest.is_win, betRequest.is_win)
       return NextResponse.json(
-        { error: 'is_win must be a boolean' },
+        { error: 'is_win must be a boolean or null' },
         { status: 400 }
       );
     }
@@ -75,8 +77,11 @@ export async function POST(request: Request) {
     const golangBetRequest = {
       player_address: betRequest.player_address,
       wager_amount: betRequest.wager_amount,
-      is_win: betRequest.is_win
+      is_win: betRequest.is_win,
+      placed_at: betRequest.placed_at
     };
+
+    console.log("Sending bet to backend:", golangBetRequest);
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -96,6 +101,7 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json();
+    console.log("successfully placed bet", data)
 
     return NextResponse.json(data);
 

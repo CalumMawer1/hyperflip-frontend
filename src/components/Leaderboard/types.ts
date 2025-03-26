@@ -6,8 +6,7 @@ export interface PlayerStats {
   net_gain: number;
   win_percentage: number;
   is_user?: boolean;
-  rank_by_net_gain?: number;
-  rank_by_total_bets?: number;
+  rank: number;
 }
 
 export interface PaginationInfo {

@@ -38,7 +38,7 @@ const getRelativeTimeString = (timestamp: number): string => {
 };
 
 const BetHistory = () => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   const { betHistory } = useGame();
 
 

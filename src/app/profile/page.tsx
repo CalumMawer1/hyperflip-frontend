@@ -1,16 +1,14 @@
 'use client';
 
-import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { CircularIndicator, StatsCard, ProfileCard } from '@/components/Profile';
-import { UserProvider, useUserProvider } from '@/providers/UserProvider';
+import { useUserProvider } from '@/providers/UserProvider';
 import Navbar from '@/components/Layout/Navbar';
 import FuturisticBackground from '@/components/Layout/FuturisticBackground';
 
 export default function ProfilePage() {
   const [mounted, setMounted] = useState(false);
-  const { address } = useAccount();
 
   useEffect(() => {
     setMounted(true);
@@ -56,12 +54,10 @@ export default function ProfilePage() {
   }
 
   return (
-    <UserProvider initialAddress={address}>
       <ProfileContent 
         formatTimeSince={formatTimeSince} 
         formatAddress={formatAddress} 
       />
-    </UserProvider>
   );
 }
 
@@ -78,64 +74,14 @@ function ProfileContent({ formatTimeSince, formatAddress }: {
     totalWagered,
     winPercentage,
     numPoints,
-    isLoading: loading,
-    lastRefreshed,
-    refreshUserData,
-    isRefreshNeeded,
   } = useUserProvider();
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Profile data:', {
-      address,
-      totalBets,
-      wins,
-      losses,
-      totalProfit,
-      totalWagered,
-      winPercentage,
-      numPoints,
-      loading,
-      lastRefreshed
-    });
-  }, [address, totalBets, wins, losses, totalProfit, totalWagered, winPercentage, numPoints, loading, lastRefreshed]);
-
-  useEffect(() => {
-    if (address) {
-      refreshUserData(true);
-    }
-  }, [address, refreshUserData]);
   
   const displayTotalWagered = totalWagered || 0;
 
   const displayWinRate = winPercentage !== undefined 
     ? Math.round(winPercentage * 100) 
     : (totalBets && totalBets > 0 ? Math.round((wins || 0) / totalBets * 100) : 0);
-  
-  // const renderLastUpdated = () => {
-  //   if (typeof window === 'undefined' || !lastRefreshed) return null;
-    
-  //   const formattedTime = formatTimeSince(lastRefreshed);
-    
-  //   return (
-  //     <div className="text-sm text-gray-400 mt-1 sm:mt-0 flex items-center justify-end">
-  //       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-  //         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  //       </svg>
-  //       Updated: {formattedTime}
-  //       <button 
-  //         onClick={() => refreshUserData(true)}
-  //         className={`ml-2 text-primary hover:text-primary/80 transition-colors ${isRefreshNeeded ? 'animate-pulse' : ''}`}
-  //         title={isRefreshNeeded ? "Update available" : "Check for updates"}
-  //         disabled={loading}
-  //       >
-  //         <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-  //           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-  //         </svg>
-  //       </button>
-  //     </div>
-  //   );
-  // };
 
   return (
     <FuturisticBackground>

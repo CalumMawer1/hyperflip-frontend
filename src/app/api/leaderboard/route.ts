@@ -4,6 +4,8 @@ const API_BASE_URL = process.env.API_URL || 'http://localhost:8080'
 const API_KEY = process.env.API_KEY;
 
 export const dynamic = "force-dynamic";
+// Add revalidate = 0 to disable caching
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +14,6 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit');
     const playerAddress = searchParams.get('player_address');
     const sortBy = searchParams.get('sort_by');
-    const forceRefresh = searchParams.has('t') || searchParams.has('_debug');
 
     
     if (!API_KEY) {
@@ -33,21 +34,17 @@ export async function GET(request: NextRequest) {
       console.log(`Adding sort_by=${sortBy} to API URL`);
     }
     
-    if (forceRefresh) {
-      apiUrl += `&_t=${Date.now()}`;
-    }
-
-    console.log(`Calling backend API with URL: ${apiUrl}`);
+    apiUrl += `&_t=${Date.now()}`;
 
     const response = await fetch(apiUrl, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_KEY}`
       },
-      cache: forceRefresh ? 'no-store' : 'no-cache'
+      cache: 'no-store'
     });
     
-    if (!response.ok) {
+    if (!response.ok) { 
       throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`);
     }
     
@@ -55,7 +52,7 @@ export async function GET(request: NextRequest) {
     
     const responseData = NextResponse.json(data);
     
-    // Always set cache control to no-cache to prevent caching issues with sort parameter
+    // no cacheing
     responseData.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     responseData.headers.set('Pragma', 'no-cache');
     responseData.headers.set('Expires', '0');

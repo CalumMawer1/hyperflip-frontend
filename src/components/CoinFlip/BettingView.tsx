@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGame } from '../../providers/GameProvider';
 import Coin from './Coin';
 
@@ -33,7 +33,6 @@ export default function BettingView() {
     selectedAmount,
     setSelectedAmount,
     isFlipping,
-    gameResult,
     allowedBetAmounts,
     isWhitelisted,
     hasUsedFreeBet,
@@ -48,14 +47,16 @@ export default function BettingView() {
     pendingBet,
   } = useGame();
 
+
   return (
-    <div className="flex flex-col items-center justify-start space-y-0 pt-0 w-full max-w-md mx-auto">
+    <div className="flex flex-col items-center justify-start space-y-0 pt-0 w-full max-w-md mx-auto -mt-8">
       {/* Coin Display */}
-      <div className={`-mt-0 mb-0 ${!isFlipping ? "hover-animation" : ""}`} style={{ transformStyle: 'preserve-3d', zIndex: "-1" }}>
+      <div className="-translate-y-10" style={{ transformStyle: 'preserve-3d', zIndex: "-1" }}>
         <Coin
           isFlipping={false}
-          result={gameResult}
-          selectedChoice={selectedChoice}
+          result={null}
+          side={selectedChoice || 0}
+          onSpinningComplete={() => {}}
         />
       </div>
       
@@ -166,8 +167,6 @@ export default function BettingView() {
               <span className="animate-pulse mr-2 w-3 h-3 rounded-full bg-white"></span>
               Processing...
             </span>
-          ) : isFlipping ? (
-            'Flipping...'
           ) : (
             'Place Bet'
           )}

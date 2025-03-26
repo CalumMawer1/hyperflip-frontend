@@ -131,7 +131,6 @@ export const useContractHandler = (address: Address, isConnected: boolean) => {
         setCurrChoice(choice === 0 ? false : true);
         setLastTxType('bet');
         
-        // Still return true because we can't know yet if the user will cancel
         return true;
       } catch (error) {
         throw error; 
@@ -171,7 +170,6 @@ export const useContractHandler = (address: Address, isConnected: boolean) => {
         };
                 
         setBetHistory(prev => {
-          // Check if bet already exists in history
           const exists = prev.some(bet => 
             bet.timestamp === currentTimestamp && 
             bet.amount === normalizedAmount &&
@@ -188,7 +186,7 @@ export const useContractHandler = (address: Address, isConnected: boolean) => {
         });
       }
     }
-  }, [betDetailsData, currChoice, hasUsedFreeBet, lastTxType, incrementPoints, isWhitelisted]);
+  }, [betDetailsData, currChoice, hasUsedFreeBet, lastTxType, isWhitelisted]);
 
 
 
@@ -206,7 +204,6 @@ export const useContractHandler = (address: Address, isConnected: boolean) => {
   useEffect(() => {
     if (settleError) {
         setSettleIsRejected(true);
-        setSettleIsRejected(false);
     }
   }, [settleError]);
   
@@ -230,6 +227,7 @@ export const useContractHandler = (address: Address, isConnected: boolean) => {
     if (isSettleSuccess && settleTxHash) {
       // Clear the rejection state when settlement succeeds
       setSettleIsRejected(false);
+      incrementPoints(100);
     }
   }, [isSettleSuccess, settleTxHash]);
 
@@ -352,6 +350,6 @@ export const useContractHandler = (address: Address, isConnected: boolean) => {
     isFreeBetSuccess,
     lastTxType,
     setLastTxType,
-    settleIsRejected
+    settleIsRejected,
   };
 };

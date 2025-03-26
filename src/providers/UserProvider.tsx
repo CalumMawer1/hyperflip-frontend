@@ -1,13 +1,11 @@
 "use client"
 
-import { createContext, ReactNode, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, ReactNode, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Address } from "viem";
+import { useAccount } from 'wagmi';
 
-// #################### Constants & Interfaces ####################
+
 const PENDING_POINTS_KEY_PREFIX = 'hyperflip_pending_points_';
-const LAST_REFRESH_KEY_PREFIX = 'hyperflip_last_refresh_';
-const USER_DATA_KEY_PREFIX = 'hyperflip_user_data_';
-const USER_ETAG_KEY_PREFIX = 'hyperflip_user_etag_';
 
 interface UserContextType {
     walletAddress?: Address;
@@ -15,17 +13,16 @@ interface UserContextType {
     numWins?: number;
     numLosses?: number;
     netGain?: number;
-    numPoints?: number; // just numBets * 100
+    numPoints?: number;
     totalWagered?: number;
     winPercentage?: number;
     playerRankByNetGain?: number | string | null;
     playerRankByTotalBets?: number | string | null;
-    playerRank?: number | string | null; // For backward compatibility
+    playerRank?: number | string | null;
     isLoading: boolean;
     lastRefreshed: number | null;
     isRefreshNeeded: boolean;
 
-    setWalletAddress: (addr: Address) => void;
     setNumBets: (numBets: number) => void;
     setNumWins: (numWins: number) => void;
     setNumLosses: (numLosses: number) => void;
@@ -48,9 +45,37 @@ interface UserProviderInput {
 
 const UserContext = createContext<UserContextType | null>(null);
 
+const getPendingPointsKey = (address?: Address) => {
+    return address ? `${PENDING_POINTS_KEY_PREFIX}${address.toLowerCase()}` : null;
+};
+
+const loadPendingPoints = (address?: Address) => {
+    if (!address || typeof window === 'undefined') return 0;
+    const key = getPendingPointsKey(address);
+    if (!key) return 0;
+    try {
+        const stored = localStorage.getItem(key);
+        return stored ? parseInt(stored, 10) : 0;
+    } catch (e) {
+        console.error('Error loading pending points:', e);
+        return 0;
+    }
+};
+
+const savePendingPoints = (points: number, address?: Address) => {
+    if (!address || typeof window === 'undefined') return;
+    const key = getPendingPointsKey(address);
+    if (!key) return;
+    try {
+        localStorage.setItem(key, points.toString());
+    } catch (e) {
+        console.error('Error saving pending points:', e);
+    }
+};
+
 
 export function UserProvider({ children, initialAddress }: UserProviderInput) {
-    const [walletAddress, setWalletAddress] = useState<Address | undefined>(initialAddress);
+    const {address: walletAddress} = useAccount();
     const [numBets, setNumBets] = useState<number>();
     const [numWins, setNumWins] = useState<number>();
     const [numLosses, setNumLosses] = useState<number>();
@@ -64,207 +89,43 @@ export function UserProvider({ children, initialAddress }: UserProviderInput) {
     const [lastRefreshed, setLastRefreshed] = useState<number | null>(null);
     const [pendingPoints, setPendingPoints] = useState<number>(0);
     const [isRefreshNeeded, setIsRefreshNeeded] = useState<boolean>(false);
+    
+    // Track last time forceRefreshData was called
+    const lastForceRefreshTimeRef = useRef<number>(0);
 
-    // #################### Key Generators ####################
-    const getLastRefreshKey = useCallback((address?: Address) => {
-        return address ? `${LAST_REFRESH_KEY_PREFIX}${address.toLowerCase()}` : null;
-    }, []);
-
-    const getPendingPointsKey = useCallback((address?: Address) => {
-        return address ? `${PENDING_POINTS_KEY_PREFIX}${address.toLowerCase()}` : null;
-    }, []);
-
-    const getUserDataKey = useCallback((address?: Address) => {
-        return address ? `${USER_DATA_KEY_PREFIX}${address.toLowerCase()}` : null;
-    }, []);
-
-    const getETagKey = useCallback((address?: Address) => {
-        return address ? `${USER_ETAG_KEY_PREFIX}${address.toLowerCase()}` : null;
-    }, []);
-
-    // ############################ Local Storage #############################
-    // last refresh
-    const saveLastRefreshTime = useCallback((timestamp: number, address?: Address) => {
-        if (!address || typeof window === 'undefined') return;
-        const key = getLastRefreshKey(address);
-        if (!key) return;
-        try {
-            localStorage.setItem(key, timestamp.toString());
-        } catch (e) {
-            console.error('Error saving last refresh time:', e);
-        }
-    }, [getLastRefreshKey]);
-
-    const loadLastRefreshTime = useCallback((address?: Address) => {
-        if (!address || typeof window === 'undefined') return null;
-        const key = getLastRefreshKey(address);
-        if (!key) return null;
-        try {
-            const stored = localStorage.getItem(key);
-            return stored ? parseInt(stored, 10) : null;
-        } catch (e) {
-            console.error('Error loading last refresh time:', e);
-            return null;
-        }
-    }, [getLastRefreshKey]);
-
-    // pending points
-    const loadPendingPoints = useCallback((address?: Address) => {
-        if (!address || typeof window === 'undefined') return 0;
-        const key = getPendingPointsKey(address);
-        if (!key) return 0;
-        try {
-            const stored = localStorage.getItem(key);
-            return stored ? parseInt(stored, 10) : 0;
-        } catch (e) {
-            console.error('Error loading pending points:', e);
-            return 0;
-        }
-    }, [getPendingPointsKey]);
-
-    const savePendingPoints = useCallback((points: number, address?: Address) => {
-        if (!address || typeof window === 'undefined') return;
-        const key = getPendingPointsKey(address);
-        if (!key) return;
-        try {
-            localStorage.setItem(key, points.toString());
-        } catch (e) {
-            console.error('Error saving pending points:', e);
-        }
-    }, [getPendingPointsKey]);
-
-    // user data
-    const saveUserData = useCallback((data: any, address?: Address) => {
-        if (!address || typeof window === 'undefined') return;
-        const key = getUserDataKey(address);
-        if (!key) return;
-        try {
-            localStorage.setItem(key, JSON.stringify(data));
-        } catch (e) {
-            console.error('Error saving user data to localStorage:', e);
-        }
-    }, [getUserDataKey]);
-
-    const loadUserData = useCallback((address?: Address) => {
-        if (!address || typeof window === 'undefined') return null;
-        const key = getUserDataKey(address);
-        if (!key) return null;
-        try {
-            const stored = localStorage.getItem(key);
-            return stored ? JSON.parse(stored) : null;
-        } catch (e) {
-            console.error('Error loading user data from localStorage:', e);
-            return null;
-        }
-    }, [getUserDataKey]);
-
-    // handle ETags
-    const saveETag = useCallback((etag: string, address?: Address) => {
-        if (!address || typeof window === 'undefined') return;
-        const key = getETagKey(address);
-        if (!key) return;
-        try {
-            localStorage.setItem(key, etag);
-        } catch (e) {
-            console.error('Error saving ETag:', e);
-        }
-    }, [getETagKey]);
-
-    const loadETag = useCallback((address?: Address) => {
-        if (!address || typeof window === 'undefined') return null;
-        const key = getETagKey(address);
-        if (!key) return null;
-        try {
-            return localStorage.getItem(key);
-        } catch (e) {
-            console.error('Error loading ETag:', e);
-            return null;
-        }
-    }, [getETagKey]);
-
-    // ############################### Load Cached Data ###################################
+    // load pending points
     useEffect(() => {
         if (walletAddress) {
-            const points = loadPendingPoints(walletAddress);
-            setPendingPoints(points);
-
-            const lastRefresh = loadLastRefreshTime(walletAddress);
-            if (lastRefresh) {
-                setLastRefreshed(lastRefresh);
-            }
-
-            const userData = loadUserData(walletAddress);
-            if (userData) {
-                setNumBets(userData.numBets);
-                setNumWins(userData.numWins);
-                setNumLosses(userData.numLosses);
-                setNetGain(userData.netGain);
-                setTotalWagered(userData.totalWagered);
-                setWinPercentage(userData.winPercentage);
-                setNumPoints(userData.numPoints);
-                setPlayerRankByNetGain(userData.playerRankByNetGain);
-                setPlayerRankByTotalBets(userData.playerRankByTotalBets);
-
-                if (lastRefresh && Date.now() - lastRefresh > 5 * 60 * 1000) {
-                    setIsRefreshNeeded(true);
-                }
-            } else {
-                setIsRefreshNeeded(true);
-            }
+            const storedPoints = loadPendingPoints(walletAddress);
+            setPendingPoints(storedPoints);
         }
-    }, [walletAddress, loadPendingPoints, loadLastRefreshTime, loadUserData]);
+    }, [walletAddress]);
 
-    // ############################## Data Refresh ####################################
-    const refreshUserData = useCallback(async (forceRefresh = false) => {
-        if (!walletAddress) return;
+    const refreshUserData = useCallback(async (forceRefresh = true) => {
+        if (!walletAddress) {
+            return;
+        }
 
-        console.log('RefreshUserData called for wallet:', walletAddress);
-        setIsLoading(true);
+        // Prevent frequent re-fetches unless explicitly forced
+        if (!forceRefresh && lastRefreshed && Date.now() - lastRefreshed < 60000) {
+            return;
+        }
+
+        const isFirstLoad = numPoints === undefined
+        if (isFirstLoad) {
+            setIsLoading(true);
+        }
+
         try {
-            // get the stored ETag unless forcing a refresh
-            const etag = forceRefresh ? null : loadETag(walletAddress);
-            const fetchOptions: RequestInit = { method: 'GET', headers: {} };
-
-            if (etag) {
-                fetchOptions.headers = { 'If-None-Match': etag };
-            }
-
-            const response = await fetch(`/api/user/${walletAddress}`, fetchOptions);
-
-            if (response.status === 304) {
-                const userData = loadUserData(walletAddress);
-                if (userData) {
-                    const pendingPoints = loadPendingPoints(walletAddress);
-                    setNumBets(userData.numBets);
-                    setNumWins(userData.numWins);
-                    setNumLosses(userData.numLosses);
-                    setNetGain(userData.netGain);
-                    setTotalWagered(userData.totalWagered);
-                    setWinPercentage(userData.winPercentage);
-                    setNumPoints(userData.numPoints + pendingPoints);
-                    setPlayerRankByNetGain(userData.playerRankByNetGain);
-                    setPlayerRankByTotalBets(userData.playerRankByTotalBets);
-
-                    const now = Date.now();
-                    setLastRefreshed(now);
-                    setIsRefreshNeeded(false);
-                    saveLastRefreshTime(now, walletAddress);
-                }
-                setIsLoading(false);
-                return;
-            }
+            console.log("Fetching user data for:", walletAddress);
+            const url = `/api/user/${walletAddress}`;
+            const fetchOptions: RequestInit = { method: 'GET' };
+            const response = await fetch(url, fetchOptions);
 
             if (response.ok) {
-                const newEtag = response.headers.get('ETag');
-                if (newEtag) {
-                    saveETag(newEtag, walletAddress);
-                }
-
                 const data = await response.json();
-
                 const serverPoints = (data.totalBets || 0) * 100;
                 const now = Date.now();
-                const totalPoints = serverPoints
 
                 setNumBets(data.totalBets || 0);
                 setNumWins(data.wins || 0);
@@ -272,53 +133,32 @@ export function UserProvider({ children, initialAddress }: UserProviderInput) {
                 setNetGain(data.totalProfit || 0);
                 setTotalWagered(data.totalWagered || 0);
                 setWinPercentage(data.winPercentage || 0);
-                setNumPoints(totalPoints);
-
+                setNumPoints(serverPoints);
                 if (data.playerRankByNetGain !== undefined) {
                     setPlayerRankByNetGain(data.playerRankByNetGain);
-                } 
-
+                }
                 if (data.playerRankByTotalBets !== undefined) {
                     setPlayerRankByTotalBets(data.playerRankByTotalBets);
-                } 
-
+                }
                 setLastRefreshed(now);
                 setIsRefreshNeeded(false);
-                saveLastRefreshTime(now, walletAddress);
 
-                // save to local storage
-                const userData = {
-                    numBets: data.totalBets || 0,
-                    numWins: data.wins || 0,
-                    numLosses: data.losses || 0,
-                    netGain: data.totalProfit || 0,
-                    totalWagered: data.totalWagered || 0,
-                    winPercentage: data.winPercentage || 0,
-                    numPoints: totalPoints,
-                    playerRankByNetGain: data.playerRankByNetGain,
-                    playerRankByTotalBets: data.playerRankByTotalBets
-                };
-                saveUserData(userData, walletAddress);
-
-                if (forceRefresh) {
-                    setPendingPoints(0);
-                    savePendingPoints(0, walletAddress);
-                }
+                setPendingPoints(0);
+                savePendingPoints(0, walletAddress);
             } else {
-                console.error(`Failed to fetch profile data: Status ${response.status}`);
                 setIsRefreshNeeded(true);
             }
         } catch (error) {
-            console.error('Error refreshing user data:', error);
             setIsRefreshNeeded(true);
         } finally {
             setIsLoading(false);
         }
-    }, [walletAddress, loadPendingPoints, savePendingPoints, saveLastRefreshTime, saveUserData, loadUserData, loadETag, saveETag]);
+    }, [walletAddress]);
 
+    // wallet address changes - simplified to just fetch data without tracking initialFetch
     useEffect(() => {
         if (walletAddress) {
-            setIsRefreshNeeded(true);
+            refreshUserData(true);
         } else {
             setNumBets(undefined);
             setNumWins(undefined);
@@ -330,43 +170,35 @@ export function UserProvider({ children, initialAddress }: UserProviderInput) {
             setPlayerRankByNetGain(undefined);
             setPlayerRankByTotalBets(undefined);
             setLastRefreshed(null);
+            setPendingPoints(0);
         }
-    }, [walletAddress]);
+    }, [walletAddress, refreshUserData]);
 
-    // #################### State Mutations & Utility Functions ####################
+    // ############ State Mutations & Utility Functions ############
     const forceRefreshData = useCallback(async () => {
         if (!walletAddress) return;
-        // Clear pending points and force refresh API call
-        setPendingPoints(0);
-        savePendingPoints(0, walletAddress);
+        
+        // Prevent rapid consecutive force refreshes
+        const now = Date.now();
+        if (now - lastForceRefreshTimeRef.current < 5000) { // 5 second debounce
+            console.log("Prevented rapid force refresh", { 
+                elapsed: now - lastForceRefreshTimeRef.current 
+            });
+            return;
+        }
+        
+        lastForceRefreshTimeRef.current = now;
         await refreshUserData(true);
-    }, [walletAddress, refreshUserData, savePendingPoints]);
+    }, [walletAddress, refreshUserData]);
 
     const incrementPoints = useCallback((amount = 100) => {
-        // Update overall points and persist changes
-        setNumPoints(prev => {
-            const updatedPoints = prev === undefined ? amount : prev + amount;
-            if (walletAddress) {
-                const userData = loadUserData(walletAddress);
-                if (userData) {
-                    userData.numPoints = updatedPoints;
-                    saveUserData(userData, walletAddress);
-                }
-            }
-            return updatedPoints;
-        });
-
+        setNumPoints(prev => (prev === undefined ? amount : prev + amount));
         setPendingPoints(prev => {
             const newPendingPoints = prev + amount;
             savePendingPoints(newPendingPoints, walletAddress);
             return newPendingPoints;
         });
-
-        // Update bets count when default amount is added
-        if (amount === 100) {
-            setNumBets(prev => (prev === undefined ? 1 : prev + 1));
-        }
-    }, [walletAddress, savePendingPoints, loadUserData, saveUserData]);
+    }, [walletAddress]);
 
     const getPlayerRankBySortOption = useCallback((sortOption: 'net_gain' | 'total_bets') => {
         return sortOption === 'net_gain'
@@ -374,7 +206,6 @@ export function UserProvider({ children, initialAddress }: UserProviderInput) {
             : (playerRankByTotalBets !== undefined ? playerRankByTotalBets : null);
     }, [playerRankByNetGain, playerRankByTotalBets]);
 
-    // #################### Context Value & Provider ####################
     const value: UserContextType = {
         walletAddress,
         numBets,
@@ -390,7 +221,6 @@ export function UserProvider({ children, initialAddress }: UserProviderInput) {
         isLoading,
         lastRefreshed,
         isRefreshNeeded,
-        setWalletAddress,
         setNumBets,
         setNumWins,
         setNumLosses,
@@ -404,7 +234,7 @@ export function UserProvider({ children, initialAddress }: UserProviderInput) {
         refreshUserData,
         incrementPoints,
         forceRefreshData,
-    }
+    };
 
     return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 }
