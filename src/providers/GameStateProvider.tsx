@@ -59,7 +59,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
         settledBetResult,
         setSettledBetResult,
         placeBetError
-    } = usePlaceBet();
+    } = usePlaceBet({ watchEvents: true });
 
     const {
         isFreeBetEligible,

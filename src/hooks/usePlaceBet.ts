@@ -34,6 +34,8 @@ interface PendingBet {
     isFreeBet: boolean;
 }
 
+// Global Set to track processed events across all hook instances
+const processedBetEvents = new Set<string>();
 
 type UsePlaceBetResult = {
     settledBetResult: SettledBetResult | null;
@@ -82,7 +84,7 @@ function calculateTotalValue(betAmount: string, pythFee: bigint) {
 }
 
 
-export function usePlaceBet(): UsePlaceBetResult {
+export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult {
     const { address } = useAccount();
     const { handleNewBet } = useUserProvider();
 
@@ -237,71 +239,77 @@ export function usePlaceBet(): UsePlaceBetResult {
         )
     }, [executeBet])
 
-    // Watch for bet settlement events - only need this one
-    useWatchContractEvent({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        eventName: 'BetSettled',
-        poll: true,
-        pollingInterval: 1000,
-        batch: false,
-        onError: (error) => {
-            console.error("[usePlaceBet] Error watching BetSettled event", error);
-        },
-        onLogs: (logs) => {
-            
-            logs.forEach(log => {
-                // Properly type the log event
-                const typedLog = log as unknown as BetSettledEvent;
-                const {args} = typedLog;
-                
-                logBet("[usePlaceBet] BetSettled Event Received", {
-                    player: args.player,
-                    amount: Number(args.amount) / 1e18,
-                    won: args.won,
-                    result: args.result,
-                    currentAddress: address,
-                });
-                
-                // Only process events for the current user
-                if (args.player.toLowerCase() === address?.toLowerCase()) {
-                    console.log("[usePlaceBet] BetSettled event received for current user");
+    // Watch for bet settlement events - only if watchEvents is true
+    if (options.watchEvents) {
+        useWatchContractEvent({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            eventName: 'BetSettled',
+            poll: true,
+            pollingInterval: 1000,
+            strict: false,
+            batch: false,
+            onError: (error) => {
+                console.error("[usePlaceBet] Error watching BetSettled event", error);
+            },
+            onLogs: (logs) => {
+                logs.forEach(log => {
+                    // Create unique event ID that persists across hook instances
+                    const eventId = `${log.transactionHash}-${log.logIndex}`;
                     
-                    // Get bet amount in HYPE
-                    const betAmount = Number(args.amount) / 1e18; 
+                    // Skip if we've already processed this event in any hook instance
+                    if (processedBetEvents.has(eventId)) {
+                        logBet("[usePlaceBet] Skipping already processed event", { eventId });
+                        return;
+                    }
                     
-                    // Create settlement details
-                    const betDetails: SettledBetResult = {
-                        amount: betAmount,
-                        placedAt: Math.floor(Date.now() / 1000),
-                        playerWon: args.won,
-                        landedOn: args.result
-                    };
+                    // Add to global processed set
+                    processedBetEvents.add(eventId);
                     
-                    setSettledBetResult(betDetails);
+                    const typedLog = log as unknown as BetSettledEvent;
+                    const {args} = typedLog;
                     
-                    // Add bet to history using context (this will update all components using the context)
-                    const newBet: NewBet = {
-                        amount: betAmount,
-                        playerChoice: args.result, // Use matched choice or fallback
+                    logBet("[usePlaceBet] BetSettled Event Received", {
+                        player: args.player,
+                        amount: Number(args.amount) / 1e18,
+                        won: args.won,
                         result: args.result,
-                        isFreeBet: betAmount === 0 || betAmount === null || betAmount === undefined,
-                        playerWon: args.won
-                    };
+                        currentAddress: address,
+                    });
                     
-                    logBet("Adding bet to history", newBet);
-                    addBetToHistory(newBet);
-                    
-                    // Record bet with API service
-                    recordBet(address, betDetails.amount, betDetails.playerWon, betDetails.placedAt.toString());
+                    if (args.player.toLowerCase() === address?.toLowerCase()) {
+                        console.log("[usePlaceBet] BetSettled event received for current user");
+                        
+                        const betAmount = Number(args.amount) / 1e18; 
+                        
+                        const betDetails: SettledBetResult = {
+                            amount: betAmount,
+                            placedAt: Math.floor(Date.now() / 1000),
+                            playerWon: args.won,
+                            landedOn: args.result
+                        };
+                        
+                        setSettledBetResult(betDetails);
+                        
+                        const newBet: NewBet = {
+                            amount: betAmount,
+                            playerChoice: args.result,
+                            result: args.result,
+                            isFreeBet: betAmount === 0 || betAmount === null || betAmount === undefined,
+                            playerWon: args.won
+                        };
+                        
+                        addBetToHistory(newBet);
+                        
+                        recordBet(address, betDetails.amount, betDetails.playerWon, betDetails.placedAt.toString());
 
-                    // update user provider
-                    handleNewBet(betDetails.amount, betDetails.playerWon ? 1 : 0);
-                }
-            });
-            setResultIsPending(false);
-        }
-    });
+                        handleNewBet(betDetails.amount, betDetails.playerWon ? 1 : 0);
+                    }
+                });
+                setResultIsPending(false);
+            }
+        });
+    }
 
     return {
         placeBet,

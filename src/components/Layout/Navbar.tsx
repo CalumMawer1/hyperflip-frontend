@@ -50,7 +50,7 @@ function UserPoints() {
 }
 
 function PythFee() {
-  const { currPythFee, refetchPythFee } = usePlaceBet();
+  const { currPythFee, refetchPythFee } = usePlaceBet({ watchEvents: false });
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => {
