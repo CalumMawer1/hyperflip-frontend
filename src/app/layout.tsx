@@ -6,7 +6,7 @@ import { LogoStyles } from '../components/LogoStyles';
 import { StyledComponentsRegistry } from '../lib/registry';
 import { BetHistoryProvider } from '../providers/BetHistoryContext';
 import { Metadata } from 'next';
-import { montserrat, ibmPlex, poppins, tektur, brunoAce } from './fonts';
+import { tektur, brunoAce } from './fonts';
 
 export const metadata: Metadata = {
   title: 'HyperFlip - Coin Flip Game',
@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${montserrat.variable} ${ibmPlex.variable} ${poppins.variable} ${tektur.variable} ${brunoAce.variable}`}>
+    <html lang="en" className={`${tektur.variable} ${brunoAce.variable}`}>
       <head>
         {/* Preload fonts */}
       </head>

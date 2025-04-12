@@ -8,9 +8,6 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        'montserrat': ['var(--font-montserrat)', 'sans-serif'],
-        'ibmplex': ['var(--font-ibmplex)', 'monospace'],
-        'poppins': ['var(--font-poppins)', 'sans-serif'],
         'primary': ['var(--font-tektur)', 'sans-serif'],
         'title': ['var(--font-brunoace)', 'sans-serif'],
       },
