@@ -58,7 +58,7 @@ const CircularIndicator: React.FC<CircularIndicatorProps> = ({
         {showLabel && (
           <div className="absolute inset-0 flex items-center justify-center">
             <span 
-              className={`${labelClassName} text-primary font-mono tracking-tight transition-all duration-300`}
+              className={`${labelClassName} font-primary font-mono tracking-tight transition-all duration-300`}
               style={{ 
                 textShadow: '0 0 5px rgba(var(--color-primary-rgb), 0.7)'
               }}

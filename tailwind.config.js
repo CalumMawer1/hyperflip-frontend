@@ -7,6 +7,13 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        'montserrat': ['var(--font-montserrat)', 'sans-serif'],
+        'ibmplex': ['var(--font-ibmplex)', 'monospace'],
+        'poppins': ['var(--font-poppins)', 'sans-serif'],
+        'primary': ['var(--font-tektur)', 'sans-serif'],
+        'title': ['var(--font-brunoace)', 'sans-serif'],
+      },
       colors: {
         primary: {
           DEFAULT: 'rgb(4, 230, 224)',
@@ -32,7 +39,8 @@ module.exports = {
           card: 'rgba(0, 0, 0, 0.6)',
           hover: 'rgba(4, 230, 224, 0.1)',
         },
-        white: "#FEFCE1"
+        white: "#F5FEFD",
+        green: "rgba(4, 230, 224, 0.85)"
       },
       animation: {
         'fall-in': 'fallIn 0.4s ease-out forwards',

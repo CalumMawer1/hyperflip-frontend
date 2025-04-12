@@ -10,7 +10,8 @@ interface BetRequest {
 }
 
 const validBetSizes = [0.0, 0.25, 0.5, 1, 2];
-const API_BASE_URL = "http:localhost:8080";
+// const API_BASE_URL = process.env.NODE_ENV === "production" ? process.env.API_URL : "http://localhost:8080";
+const API_BASE_URL = process.env.API_URL;
 const API_KEY = process.env.API_KEY;
 
 export async function POST(request: Request) {

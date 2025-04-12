@@ -4,8 +4,9 @@ import { WalletProvider } from '../providers/WalletProvider';
 import { UserProvider } from '../providers/UserProvider';
 import { LogoStyles } from '../components/LogoStyles';
 import { StyledComponentsRegistry } from '../lib/registry';
+import { BetHistoryProvider } from '../providers/BetHistoryContext';
 import { Metadata } from 'next';
-import LoadingBar from '@/components/utils/LoadingBar';
+import { montserrat, ibmPlex, poppins, tektur, brunoAce } from './fonts';
 
 export const metadata: Metadata = {
   title: 'HyperFlip - Coin Flip Game',
@@ -26,13 +27,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${montserrat.variable} ${ibmPlex.variable} ${poppins.variable} ${tektur.variable} ${brunoAce.variable}`}>
+      <head>
+        {/* Preload fonts */}
+      </head>
       <body className={GeistSans.className}>
         <StyledComponentsRegistry>
           <WalletProvider>
             <UserProvider>
-              <LogoStyles />
-              {children}
+              <BetHistoryProvider>
+                <LogoStyles />
+                {children}
+              </BetHistoryProvider>
             </UserProvider>
           </WalletProvider>
         </StyledComponentsRegistry>

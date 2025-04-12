@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const API_BASE_URL = process.env.API_URL || 'http://localhost:8080';
+// const API_BASE_URL = process.env.NODE_ENV === "production" ? process.env.API_URL : 'http://localhost:8080';
+const API_BASE_URL = process.env.API_URL;
 const API_KEY = process.env.API_KEY;
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { walletAddress: string } }
 ) {
+
+  console.log('API_BASE_URL', API_BASE_URL);
+  console.log('API_KEY', API_KEY);
   
   try {
     const { walletAddress } = params;
@@ -35,7 +38,6 @@ export async function GET(
     // Add timestamp to prevent caching
     url.searchParams.append('_t', Date.now().toString());
     
-    console.log("fetching:", url.toString())
     const fetchOptions: RequestInit = {
       method: 'GET',
       headers: {
@@ -62,7 +64,6 @@ export async function GET(
       }
       
       const errorText = await response.text();
-      console.error(`Error fetching profile: ${response.status} - ${errorText}`);
       return NextResponse.json(
         { error: 'Failed to fetch profile data' },
         { status: response.status }
@@ -70,7 +71,6 @@ export async function GET(
     }
 
     const data = await response.json();
-    // console.log("raw user data", data)
         
     const transformedData = {
       totalBets: (data.player?.wins || 0) + (data.player?.losses || 0),
@@ -80,8 +80,10 @@ export async function GET(
       winPercentage: data.player?.win_percentage || 0,
       totalWagered: data.player?.total_wagered || 0,
       playerRankByNetGain: data.rank_by_net_gain || null,
-      playerRankByTotalBets: data.rank_by_total_bets || null
+      playerRankByTotalWagered: data.rank_by_total_wagered || null
     };
+
+    console.log('transformed data', transformedData)
     
     // console.log('transformed data', transformedData)
     const responseData = NextResponse.json(transformedData);
@@ -93,7 +95,6 @@ export async function GET(
     
     return responseData;
   } catch (error) {
-    console.error('Error in user API route:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

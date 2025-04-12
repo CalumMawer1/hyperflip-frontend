@@ -1,46 +1,23 @@
-import React, { useState} from 'react';
+import React, { useState } from 'react';
 import { StdTailsSVG, StdHeadsSVG } from './CoinSVG';
-import { useGame } from '../../providers/GameProvider';
-import './style/scrollbar.css';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useBetHistory } from '../../providers/BetHistoryContext';
+import './style/scrollbar.css';
+import { getRelativeTimeString } from '../../utils/helpers';
 
 
-const getRelativeTimeString = (timestamp: number): string => {
-  const now = Date.now();
-  const diffInSeconds = Math.floor((now - timestamp) / 1000);
-  
-  if (diffInSeconds < 60) {
-    return `${diffInSeconds} seconds ago`;
-  }
-  
-  const diffInMinutes = Math.floor(diffInSeconds / 60);
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
-  }
-  
-  const diffInHours = Math.floor(diffInMinutes / 60);
-  if (diffInHours < 24) {
-    return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
-  }
-  
-  const diffInDays = Math.floor(diffInHours / 24);
-  if (diffInDays < 30) {
-    return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`;
-  }
-   
-  const diffInMonths = Math.floor(diffInDays / 30);
-  if (diffInMonths < 12) {
-    return `${diffInMonths} ${diffInMonths === 1 ? 'month' : 'months'} ago`;
-  }
-  
-  const diffInYears = Math.floor(diffInMonths / 12);
-  return `${diffInYears} ${diffInYears === 1 ? 'year' : 'years'} ago`;
-};
+interface FormattedHistoryItem {
+  result: 'win' | 'lose';
+  amount: number;
+  timestamp: number;
+  choice: boolean;  // true = Tails, false = Heads
+  isFree: boolean;
+}
 
 const BetHistory = () => {
   const [isVisible, setIsVisible] = useState(true);
-  const { betHistory } = useGame();
-
+  // Get bet history directly from context - will auto-update when new bets are added
+  const { betHistory, isLoading } = useBetHistory();
 
   // normalize bet amounts to exact UI button amounts
   const normalizeAmount = (amount: number): number => {
@@ -52,6 +29,25 @@ const BetHistory = () => {
   };
 
   const toggleVisibility = () => setIsVisible(!isVisible);
+
+  // Format history items for display
+  const formattedHistory: FormattedHistoryItem[] = betHistory.map((bet) => {
+    // Debug the incoming bet data
+    console.log("[BetHistory] Formatting bet for display:", {
+      playerChoice: bet.playerChoice,
+      result: bet.result,
+      playerWon: bet.playerWon,
+      amount: bet.amountInHype
+    });
+    
+    return {
+      result: bet.playerWon ? 'win' : 'lose',
+      amount: normalizeAmount(parseFloat(bet.amountInHype)),
+      timestamp: bet.placedAt.getTime(),
+      choice: bet.playerChoice === 'Tails', // true if Tails, false if Heads
+      isFree: bet.isFreeBet
+    };
+  });
 
   return (
     <div className="h-full w-full relative">
@@ -83,19 +79,27 @@ const BetHistory = () => {
                 />
               </svg>
             </motion.div>
-            <span>Recent Flips</span>
+            <span className="font-title text-[#F5FEFD]">Recent Flips</span>
           </div>
           <div className="title-underline absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-primary/70 to-transparent"></div>
         </div>
         
         {/* Scrollable Items Container */}
         <div 
-          className="history-content overflow-y-auto custom-scrollbar p-3 shadow-inner shadow-black/20" 
+          className="font-primary history-content overflow-y-auto custom-scrollbar p-3 shadow-inner shadow-black/20" 
           style={{ height: 'calc(100% - 3rem)' }}
         >
-          {betHistory && betHistory.length > 0 ? (
+          {isLoading ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-[#04e6e0] font-semibold flex items-center justify-center">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#04e6e0] mr-2 animate-pulse"></div>
+                Loading history...
+                <div className="w-1.5 h-1.5 rounded-full bg-[#04e6e0] ml-2 animate-pulse"></div>
+              </div>
+            </div>
+          ) : formattedHistory && formattedHistory.length > 0 ? (
             <div className="flex flex-col space-y-3">
-              {betHistory.map((bet, index) => (
+              {formattedHistory.map((bet: FormattedHistoryItem, index: number) => (
                 <div
                   key={`bet-${bet.timestamp}-${index}`}
                   className={`flip-history-item relative group flex items-center p-4 rounded-xl transition-all ${
@@ -118,7 +122,7 @@ const BetHistory = () => {
                   <div className="flex flex-col relative z-10">
                     <div className="flex items-center">
                       <span className="text-sm font-bold text-white">
-                        {normalizeAmount(bet.amount)} HYPE on {bet.choice ? 'Tails' : 'Heads'}
+                        {bet.amount} HYPE on {bet.choice ? 'Tails' : 'Heads'}
                       </span>
                       {bet.isFree && (
                         <span className="ml-2 text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full border border-green-500/30">
@@ -136,14 +140,14 @@ const BetHistory = () => {
                     {bet.result === 'win' ? (
                       <div className="flex flex-col items-end">
                         <span className="text-[#04e6e0] font-bold text-lg">
-                          +{normalizeAmount(bet.amount)} HYPE
+                          +{bet.amount} HYPE
                         </span>
                         <span className="text-xs text-[#04e6e0]/70">Winner!</span>
                       </div>
                     ) : (
                       <div className="flex flex-col items-end">
                         <span className="text-red-400 font-bold text-lg">
-                          -{normalizeAmount(bet.amount)} HYPE
+                          -{bet.amount} HYPE
                         </span>
                         <span className="text-xs text-red-400/70">Try again!</span>
                       </div>
@@ -196,7 +200,6 @@ const BetHistory = () => {
       </AnimatePresence>
     </div>
   );
-  
 };
 
 export default BetHistory;

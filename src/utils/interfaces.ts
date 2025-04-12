@@ -85,3 +85,25 @@ export type BetHistoryItem = {
   isFree?: boolean;
   choice: boolean; // false for heads, true for tails
 };
+
+
+export interface SettledBetResult {
+  amount: number;
+  placedAt: number;
+  playerWon: boolean;
+  landedOn: number;
+}
+
+export interface ContractBetHistoryItem {
+  betId: number;
+  amount: number;
+  placedAt: number;
+  playerChoice: number;
+  result: number;
+  playerWon: boolean;
+  isFreeBet: boolean;
+}
+
+export type ContractBetHistory = ContractBetHistoryItem[];
+
+

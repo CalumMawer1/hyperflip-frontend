@@ -67,21 +67,15 @@ function ProfileContent({ formatTimeSince, formatAddress }: {
 }) {
   const { 
     walletAddress: address,
-    numBets: totalBets,
-    numWins: wins,
-    numLosses: losses,
-    netGain: totalProfit,
-    totalWagered,
-    winPercentage,
-    numPoints,
+    userData
   } = useUserProvider();
 
   
-  const displayTotalWagered = totalWagered || 0;
+  const displayTotalWagered = userData.totalWagered || 0;
 
-  const displayWinRate = winPercentage !== undefined 
-    ? Math.round(winPercentage * 100) 
-    : (totalBets && totalBets > 0 ? Math.round((wins || 0) / totalBets * 100) : 0);
+  const displayWinRate = userData.winPercentage !== undefined 
+    ? Math.round(userData.winPercentage * 100) 
+    : (userData.numBets && userData.numBets > 0 ? Math.round((userData.numWins || 0) / userData.numBets * 100) : 0);
 
   return (
     <FuturisticBackground>
@@ -90,13 +84,13 @@ function ProfileContent({ formatTimeSince, formatAddress }: {
       {/* Main Content */}
       <div className="pt-24 pb-12 px-4 max-w-4xl mx-auto relative z-10">
         <div className="flex justify-between items-center mb-4 mt-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gradient-primary tracking-wider flex items-center">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gradient-primary tracking-wider flex items-center font-title">
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
-              className="h-8 w-8 mr-3 text-primary" 
+              className="h-8 w-8 mr-3" 
               fill="none" 
               viewBox="0 0 24 24" 
-              stroke="currentColor"
+              stroke="#04e6e0"
             >
               <path 
                 strokeLinecap="round" 
@@ -109,9 +103,10 @@ function ProfileContent({ formatTimeSince, formatAddress }: {
           </h1>
           <Link 
             href="/" 
-            className="text-primary bg-primary-light hover:bg-primary-medium px-4 py-2 rounded-md border border-primary-dark transition-all duration-300 flex items-center"
+            className="font-primary text-[#04e6e0]  bg-primary-light hover:bg-primary-medium px-4 py-2 rounded-md border border-primary-dark transition-all duration-300 flex items-center group"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" viewBox="0 0 20 20" fill="currentColor">
+
               <path fillRule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
             </svg>
             Back to Game
@@ -121,11 +116,11 @@ function ProfileContent({ formatTimeSince, formatAddress }: {
         {!address ? (
           <div className="card-glow p-8 text-center">
             <div className="inline-block p-4 rounded-full bg-primary-light mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 font-primary/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <p className="text-xl mb-6 text-primary">No profile data found</p>
+            <p className="text-xl mb-6 font-primary">No profile data found</p>
             <Link 
               href="/" 
               className="inline-block px-6 py-3 bg-gradient-primary text-black rounded-lg font-bold hover:shadow-glow-lg transition-all transform hover:-translate-y-0.5"
@@ -137,12 +132,12 @@ function ProfileContent({ formatTimeSince, formatAddress }: {
           <div className="space-y-6">
             <ProfileCard 
               title={
-                <div className="w-full flex flex-start">
+                <div className="w-full flex flex-start font-primary">
                   <div className="w-8 h-8 rounded-full bg-primary-light border border-primary-dark flex items-center justify-center mr-3">
-                    <span className="text-primary text-sm">ID</span>
+                    <span className="text-sm font-primary">ID</span>
                   </div>
                   <h2 className="text-xl font-semibold text-white">
-                    <span className="font-mono text-sm text-primary">{address}</span>
+                    <span className="font-primary text-sm font-primary">{address}</span>
                   </h2>
                 </div>
               }
@@ -152,17 +147,17 @@ function ProfileContent({ formatTimeSince, formatAddress }: {
                 // </div>
               }
             >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-primary">
                 <StatsCard title="Total Bets">
-                  <span className="text-2xl font-bold text-white">{totalBets || 0}</span>
+                  <span className="text-2xl font-bold text-white">{userData.numBets || 0}</span>
                   <div className="flex space-x-2">
                     <div className="flex flex-col items-center">
                       <span className="text-xs text-gray-400">Wins</span>
-                      <span className="text-success font-bold">{wins || 0}</span>
+                      <span className="text-success font-bold">{userData.numWins || 0}</span>
                     </div>
                     <div className="flex flex-col items-center">
                       <span className="text-xs text-gray-400">Losses</span>
-                      <span className="text-error font-bold">{losses || 0}</span>
+                      <span className="text-error font-bold">{userData.numLosses || 0}</span>
                     </div>
                   </div>
                 </StatsCard>
@@ -173,46 +168,46 @@ function ProfileContent({ formatTimeSince, formatAddress }: {
                 </StatsCard>
                 
                 <StatsCard title="Total Wagered">
-                  <span className="text-2xl font-bold text-primary">{displayTotalWagered.toFixed(2)} HYPE</span>
+                  <span className="text-2xl font-bold font-primary">{displayTotalWagered.toFixed(2)} HYPE</span>
                 </StatsCard>
               </div>
               
-              <div className="mt-4 bg-background-dark/40 p-5 rounded-lg border border-primary-light hover:border-primary-dark transition-all duration-300 hover:shadow-glow">
+              <div className="mt-4 bg-background-dark/40 p-5 rounded-lg border border-primary-dark transition-all duration-300 hover:shadow-glow font-primary">
                 <div className="flex justify-between mb-2">
                   <div className="text-gray-400 text-sm">Profit & Loss</div>
-                  <div className={`text-lg font-bold ${totalProfit && totalProfit >= 0 ? 'text-success' : 'text-error'}`}>
-                    {totalProfit && totalProfit >= 0 ? '+' : ''}{totalProfit?.toFixed(2)} HYPE
+                  <div className={`text-lg font-bold ${userData.netGain && userData.netGain >= 0 ? 'text-success' : 'text-error'}`}>
+                    {userData.netGain && userData.netGain >= 0 ? '+' : ''}{userData.netGain?.toFixed(2)} HYPE
                   </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="text-gray-400 text-xs">ROI:</div>
-                  <div className={`text-sm font-medium ${totalProfit && totalProfit >= 0 ? 'text-success' : 'text-error'}`}>
+                  <div className={`text-sm font-medium ${userData.netGain && userData.netGain >= 0 ? 'text-success' : 'text-error'}`}>
                     {displayTotalWagered > 0 
-                      ? `${((totalProfit || 0) / displayTotalWagered * 100).toFixed(2)}%` 
+                      ? `${((userData.netGain || 0) / displayTotalWagered * 100).toFixed(2)}%` 
                       : '0.00%'}
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 bg-background-dark/40 p-5 rounded-lg border border-primary-light hover:border-primary-dark transition-all duration-300 hover:shadow-glow">
+              <div className="mt-4 bg-background-dark/40 p-5 rounded-lg border border-primary-dark transition-all duration-300 hover:shadow-glow font-primary">
                 <div className="flex justify-between items-center">
                   <div className="text-gray-400 text-sm">Total Points</div>
-                  <div className="text-lg font-bold text-primary">
-                    {numPoints || 0} pts
+                  <div className="text-lg font-bold font-primary">
+                    {userData.numPoints || 0} pts
                   </div>
                 </div>
                 <div className="text-xs text-gray-400 mt-1">
-                  You earn 100 points for each bet you complete
+                  You earn 100 points for each HYPE you bet
                 </div>
               </div>
             </ProfileCard>
 
             <div className="bg-background-dark/50 border border-primary-light p-4 rounded-lg backdrop-blur-sm">
               <div className="flex items-start">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 font-primary flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-sm text-gray-400">May take a couple minutes for your profile to update. Visit the <Link href="/leaderboard" className="text-primary hover:underline">leaderboard</Link> to see how you rank against other players!</p>
+                <p className="text-sm text-gray-400">Visit the <Link href="/leaderboard" className="font-primary hover:underline">leaderboard</Link> to see how you rank against other players!</p>
               </div>
             </div>
           </div>

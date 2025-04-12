@@ -1,5 +1,3 @@
-
-
 import { SVGProps } from 'react';
 
 const TextMark = (props: SVGProps<SVGSVGElement>) => (

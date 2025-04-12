@@ -116,7 +116,6 @@ export default function CoinTest() {
             isFlipping={isFlipping}
             result={result}
             side={side}
-            onSpinningComplete={() => {}}
           />
         </div>
 

@@ -1,7 +1,8 @@
 import React from 'react';
 import { PlayerStats } from './types';
 import { useUserProvider } from '@/providers/UserProvider';
-import PlayerRank from './PlayerRank';
+
+
 
 interface LeaderboardTableProps {
   players: PlayerStats[];
@@ -10,31 +11,26 @@ interface LeaderboardTableProps {
   userAddress?: string;
   isConnected: boolean;
   totalPlayers?: number;
-  sortBy: 'net_gain' | 'total_bets';
-  handleSortChange: (newSortBy: 'net_gain' | 'total_bets') => void;
+  sortBy: 'net_gain' | 'total_wagered';
+  handleSortChange: (newSortBy: 'net_gain' | 'total_wagered') => void;
 }
 
 const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   players, 
   currentPage, 
   itemsPerPage, 
-  isConnected,
-  totalPlayers = 0,
   sortBy,
   handleSortChange
 }) => {
-  const { getPlayerRankBySortOption, isLoading } = useUserProvider();
-  
-  const playerRank = getPlayerRankBySortOption(sortBy);
   
   return (
     <div className="w-full mt-4 card-glow">
       <div className="border-b border-primary-dark py-3 px-4 sm:px-6 bg-gradient-to-r from-primary-light to-transparent">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
-          <h2 className="text-xl font-semibold text-primary">Top Players</h2>
+          <h2 className="text-xl font-semibold font-title">Top Players</h2>
           
           <div className="flex items-center">
-            <div className="flex rounded-md overflow-hidden border border-[#04e6e0]/30">
+            <div className="flex rounded-md font-primary overflow-hidden border border-[#04e6e0]/30">
               <button 
                 onClick={() => handleSortChange('net_gain')}
                 className={`px-3 py-1 text-xs ${sortBy === 'net_gain' 
@@ -45,8 +41,8 @@ const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 Net Gain
               </button>
               <button 
-                onClick={() => handleSortChange('total_bets')}
-                className={`px-3 py-1 text-xs ${sortBy === 'total_bets' 
+                onClick={() => handleSortChange('total_wagered')}
+                className={`px-3 py-1 text-xs ${sortBy === 'total_wagered' 
                   ? 'bg-[#04e6e0]/30 text-[#04e6e0]' 
                   : 'bg-black/40 text-gray-400 hover:bg-black/60'
                 } transition-colors`}
@@ -57,9 +53,9 @@ const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
           </div>
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-hidden">
         {players && players.length > 0 ? (
-          <table className="w-full border-collapse text-sm" style={{ minWidth: "680px" }}>
+          <table className="w-full border-collapse text-sm font-primary" style={{ minWidth: "680px" }}>
             <thead>
               <tr className="bg-gradient-to-r from-primary-light to-background-dark/70">
                 <th className="py-3 px-3 text-left font-semibold text-gray-300 w-12">#</th>
@@ -80,17 +76,19 @@ const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 const playerRowRank = player?.rank || ((currentPage - 1) * itemsPerPage + index + 1);
                 
                 const animationDelay = `${0.1 + index * 0.05}s`;
+                const playerPoints = player.total_wagered ? Math.floor(player.total_wagered * 100) : 0;
+                
                 return (
                   <tr 
                     key={player?.player_address}
-                    className={`border-b border-primary-dark/10 h-[48px] fall-in-row
-                      ${isCurrentUser ? 'bg-primary-light' : index % 2 === 0 ? 'bg-background-dark/40' : 'bg-background-dark/20'} 
+                    className={`border-b border-primary-dark/10 h-[48px] fall-in-row font-primary
+                      ${isCurrentUser ? 'bg-primary-light' : index % 2 === 0 ? 'bg-background-medium' : 'bg-background-dark'} 
                       hover:bg-background-hover transition-colors`}
                     style={{ animationDelay }}
                   >
                     <td className="py-2 px-3 relative w-12 text-center">
                       {isTop3 ? (
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-primary-dark bg-gradient-to-br from-background-dark to-primary-light text-primary font-bold text-xs">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-primary-dark bg-gradient-to-br from-background-dark to-primary-light font-primary font-bold text-xs">
                           {playerRowRank}
                         </span>
                       ) : (
@@ -99,7 +97,7 @@ const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                     </td>
                     <td className="py-2 px-4 font-mono text-xs whitespace-normal break-all">
                       {isCurrentUser ? (
-                        <span className="font-bold text-primary flex items-center">
+                        <span className="font-bold font-primary font-primary flex items-center">
                           <span className="inline-block mr-1 w-1.5 h-1.5 rounded-full bg-primary animate-pulse flex-shrink-0"></span>
                           <span>You ({player?.player_address})</span>
                         </span>
@@ -111,11 +109,11 @@ const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                     <td className="py-2 px-4 text-right">
                       {typeof player?.win_percentage === 'number' ? (100 * player?.win_percentage).toFixed(1) : '0.0'}%
                     </td>
-                    <td className="py-2 px-4 text-right text-primary">
+                    <td className="py-2 px-4 text-right font-primary">
                       {typeof player?.total_wagered === 'number' ? player?.total_wagered.toFixed(2) : '0.00'} HYPE
                     </td> 
-                    <td className="py-2 px-4 text-right text-primary">
-                      {typeof totalBets === 'number' ? totalBets * 100 : '0.00'}
+                    <td className="py-2 px-4 text-right font-primary">
+                      {playerPoints}
                     </td>
                     <td className={`py-2 px-4 text-right font-bold ${(player?.net_gain || 0) >= 0 ? 'text-success' : 'text-error'}`}>
                       <div className="inline-flex items-center">

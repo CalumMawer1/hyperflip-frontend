@@ -1,14 +1,16 @@
+"use client"
 
+import React from 'react';
 
 const LeaderboardSkeleton: React.FC<{ itemsPerPage: number }> = ({ itemsPerPage }) => {
     return (
       <div className="w-full mt-4 bg-black/60 border border-[#04e6e0]/30 rounded-xl overflow-hidden backdrop-blur-md shadow-[0_0_15px_rgba(4,230,224,0.15)]">
         <div className="border-b border-[#04e6e0]/20 py-3 px-4 sm:px-6 bg-gradient-to-r from-[#04e6e0]/10 to-transparent">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
-            <h2 className="text-xl font-semibold text-[#04e6e0]">Top Players</h2>
+            <h2 className="text-xl font-semibold font-title text-[#04e6e0]">Top Players</h2>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto font-primary">
           <table className="w-full border-collapse text-sm" style={{ minWidth: "680px" }}>
             <thead>
               <tr className="bg-gradient-to-r from-[#04e6e0]/10 to-black/70">

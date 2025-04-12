@@ -1,9 +1,11 @@
+'use client';
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import Link from 'next/link';
 import AnimatedDiamondTrophySVG from '../Icons/AnimatedDiamondTrophySVG';
 import { Leaderboard } from './types';
-import { fetchBlock, getCachedBlock, BLOCK_SIZE } from './utils';
+import { fetchBlock, getCachedBlock, BLOCK_SIZE } from '../../services/apiService';
 import LeaderboardTable from './LeaderboardTable';
 import Pagination from './Pagination';
 import { ErrorState, NoDataState } from './StatusComponents';
@@ -11,6 +13,7 @@ import Navbar from '@/components/Layout/Navbar';
 import LeaderboardSkeleton from "./LeaderboardSkeleton";
 import PlayerRank from './PlayerRank';
 import { useUserProvider } from '@/providers/UserProvider';
+import FuturisticBackground from '../Layout/FuturisticBackground';
 
 
 const LeaderboardContent: React.FC = () => {
@@ -21,14 +24,20 @@ const LeaderboardContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isWalletLoaded, setIsWalletLoaded] = useState(false);
-  const [sortBy, setSortBy] = useState<'net_gain' | 'total_bets'>(() => {
-    if (typeof window !== 'undefined') {
-      const savedSort = localStorage.getItem('leaderboard_sort_preference');
-      return (savedSort as 'net_gain' | 'total_bets') || 'net_gain';
-    }
-    return 'net_gain';
-  });
+  const [sortBy, setSortBy] = useState<'net_gain' | 'total_wagered'>('net_gain');
+  const [isMounted, setIsMounted] = useState(false);
   const { getPlayerRankBySortOption, isLoading: isRankLoading } = useUserProvider();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const savedSort = localStorage.getItem('leaderboard_sort_preference');
+    if (savedSort === 'net_gain' || savedSort === 'total_wagered') {
+      setSortBy(savedSort);
+    }
+  }, []);
 
   useEffect(() => {
       setIsWalletLoaded(true);
@@ -44,6 +53,7 @@ const LeaderboardContent: React.FC = () => {
       const offsetInBlock = firstItemIndex % BLOCK_SIZE;
 
       const primaryBlock = await fetchBlock(blockIndex, isConnected ? address : undefined, sortBy);
+      console.log("Received primary block data:", primaryBlock);
 
       let pageData = primaryBlock.data.slice(offsetInBlock, offsetInBlock + itemsPerPage);
 
@@ -111,7 +121,7 @@ const LeaderboardContent: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handleSortChange = (newSortBy: 'net_gain' | 'total_bets') => {
+  const handleSortChange = (newSortBy: 'net_gain' | 'total_wagered') => {
     if (sortBy !== newSortBy) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('leaderboard_sort_preference', newSortBy);
@@ -129,34 +139,36 @@ const LeaderboardContent: React.FC = () => {
       
       setSortBy(newSortBy);
       setCurrentPage(1);
+      // Add console log to verify sort option
+      console.log('Changed sort option to:', newSortBy);
       // Fetch data will be triggered by useEffect
     }
   };
 
   return (
+    <FuturisticBackground>
     <div className="min-h-screen text-white pb-12 px-4 sm:px-4 w-full">
       <Navbar />
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-black">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#04e6e0]/5 via-transparent to-[#8B5CF6]/5"></div>
-          <div className="absolute inset-0 opacity-70">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#04e6e0]/15 via-transparent to-[#8B5CF6]/15 blur-[2px]"></div>
-          </div>
-        </div>
-        <div className="absolute -left-40 top-20 w-[500px] h-[500px] rounded-full bg-[#04e6e0]/5 blur-[120px]"></div>
-      </div>
+      
       
       <div className="max-w-4xl mx-auto relative z-10 pt-24">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 sm:mb-8 gap-4">
           <h1 className="text-3xl sm:text-4xl font-bold text-[#04e6e0] tracking-wider flex items-center">
             <AnimatedDiamondTrophySVG />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#04e6e0] to-[#8B5CF6]">LEADERBOARD</span>
+            <span className="bg-clip-text font-title text-transparent bg-gradient-to-r from-[#04e6e0] to-[#8B5CF6]">LEADERBOARD</span>
           </h1>
           <div className="flex flex-col sm:flex-row items-center gap-3">
-            {isConnected && (
+            {isMounted && isConnected && (
               <div className="px-4 py-2">
                 {(() => {
                   const playerRank = getPlayerRankBySortOption(sortBy);
+                  console.log("Current player rank data:", {
+                    sortBy,
+                    playerRank,
+                    isRankLoading,
+                    loading
+                  });
+                  
                   return playerRank !== undefined && playerRank !== null ? (
                     <PlayerRank 
                       playerRank={playerRank}
@@ -174,15 +186,16 @@ const LeaderboardContent: React.FC = () => {
               </div>
             )}
             
-            <Link href="/">
-              <div className="text-[#04e6e0] bg-[#04e6e0]/10 hover:bg-[#04e6e0]/20 px-4 py-2 rounded-md border border-[#04e6e0]/30 transition-all 
-              duration-300 flex items-center w-full justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                </svg>
-                Back to Game
-              </div>
-            </Link>
+            <Link 
+            href="/" 
+            className="font-primary text-[#04e6e0]  bg-primary-light hover:bg-primary-medium px-4 py-2 rounded-md border border-primary-dark transition-all duration-300 flex items-center group"
+          >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 group-hover:-translate-x-1 transition-transform" viewBox="0 0 20 20" fill="currentColor">
+
+              <path fillRule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
+            </svg>
+            Back to Game
+          </Link>
           </div>
         </div>
         
@@ -217,6 +230,7 @@ const LeaderboardContent: React.FC = () => {
         )}
       </div>
     </div>
+    </FuturisticBackground>
   );
 };
 

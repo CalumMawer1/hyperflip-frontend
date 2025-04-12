@@ -1,74 +1,116 @@
 .futuristic-background {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, #000, #001a1a);
-    z-index: -1;
-    overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #001a20, #000810 40%, #000 100%);
+  z-index: -1;
+  overflow: hidden;
+}
+
+.futuristic-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 35%, rgba(4, 230, 224, 0.15) 0%, transparent 25%),
+    radial-gradient(circle at 80% 10%, rgba(4, 230, 224, 0.1) 0%, transparent 20%);
+  animation: ambientShift 20s ease-in-out infinite alternate;
+}
+
+.futuristic-background::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h100v100H0z' fill='none'/%3E%3Cpath d='M0 0h1v1H0z' fill='rgba(4, 230, 224, 0.03)' transform='translate(0 0) scale(3)'/%3E%3C/svg%3E");
+  opacity: 0.5;
+}
+
+@keyframes driftNebula {
+  0% {
+    transform: translate(0, 0) scale(1.2);
   }
-  
-  .futuristic-background::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-      radial-gradient(circle at 20% 35%, rgba(4, 230, 224, 0.15) 0%, transparent 25%),
-      radial-gradient(circle at 80% 10%, rgba(4, 230, 224, 0.1) 0%, transparent 20%);
+  50% {
+    transform: translate(50px, -50px) scale(1.5);
   }
-  
-  .grid-lines {
-    position: absolute;
-    width: 200%;
-    height: 200%;
-    top: -50%;
-    left: -50%;
-    background-image: 
-      linear-gradient(rgba(4, 230, 224, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(4, 230, 224, 0.05) 1px, transparent 1px);
-    background-size: 50px 50px;
-    transform: perspective(500px) rotateX(60deg);
-    animation: gridMove 60s linear infinite;
-    opacity: 0.4;
+  100% {
+    transform: translate(0, 0) scale(1.2);
   }
-  
-  .glow-circle {
-    position: absolute;
-    width: 300px;
-    height: 300px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(4, 230, 224, 0.2) 0%, transparent 70%);
-    filter: blur(20px);
-    opacity: 0.5;
-    animation: pulse 10s ease-in-out infinite;
+}
+
+
+/* New glitch keyframes */
+@keyframes glitch {
+  0% {
+    clip: rect(0, 9999px, 0, 0);
+    transform: translate(0);
   }
-  
-  .glow-circle:nth-child(1) {
-    top: 20%;
-    left: 70%;
-    animation-delay: 0s;
+  10% {
+    clip: rect(10px, 9999px, 40px, 0);
+    transform: translate(-5px, 5px);
   }
-  
-  .glow-circle:nth-child(2) {
-    top: 60%;
-    left: 30%;
-    width: 200px;
-    height: 200px;
-    animation-delay: -5s;
+  20% {
+    clip: rect(20px, 9999px, 30px, 0);
+    transform: translate(5px, -5px);
   }
-  
-  @keyframes gridMove {
-    0% {
-      transform: perspective(500px) rotateX(60deg) translateY(0);
-    }
-    100% {
-      transform: perspective(500px) rotateX(60deg) translateY(50px);
-    }
+  30% {
+    clip: rect(15px, 9999px, 45px, 0);
+    transform: translate(-3px, 3px);
   }
+  40%, 100% {
+    clip: rect(0, 9999px, 0, 0);
+    transform: translate(0);
+  }
+}
+
+/* Mouse-following glow */
+.mouse-glow {
+  position: fixed;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(4,230,224,0.1) 0%, transparent 70%);
+  filter: blur(20px);
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  opacity: 0.6;
+}
+
+/* Other existing layers can be kept or slightly adjusted for even more motion */
+.grid-lines {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  background-image: 
+    linear-gradient(rgba(4,230,224,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(4,230,224,0.05) 1px, transparent 1px);
+  background-size: 50px 50px;
+  transform: perspective(500px) rotateX(60deg);
+  animation: gridMove 60s linear infinite;
+  opacity: 0.4;
+}
+
+@keyframes gridMove {
+  0% {
+    transform: perspective(500px) rotateX(60deg) translateY(0);
+  }
+  100% {
+    transform: perspective(500px) rotateX(60deg) translateY(50px);
+  }
+}
+
+/* (Keep your other CSS as is or adjust further for enhanced motion) */
+
   
   @keyframes pulse {
     0%, 100% {
@@ -81,6 +123,28 @@
     }
   }
 
+  @keyframes ambientShift {
+    0% {
+      opacity: 0.6;
+      background-position: 0% 0%;
+    }
+    50% {
+      opacity: 0.8;
+    }
+    100% {
+      opacity: 0.6;
+      background-position: 100% 100%;
+    }
+  }
+
+  @keyframes particleFloat {
+    0% {
+      background-position: 0 0, 6px 6px, 12px 12px;
+    }
+    100% {
+      background-position: 300px 300px, 306px 306px, 312px 312px;
+    }
+  }
   
   .history-sidebar {
     backdrop-filter: blur(8px);
@@ -188,4 +252,97 @@
 
 .grid {
   transition: grid-template-columns 0.3s ease-in-out;
+}
+
+.glow-circle {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(4, 230, 224, 0.2) 0%, transparent 70%);
+  filter: blur(20px);
+  opacity: 0.5;
+  animation: pulse 10s ease-in-out infinite;
+}
+
+.glow-circle:nth-child(1) {
+  top: 20%;
+  left: 70%;
+  animation-delay: 0s;
+}
+
+.glow-circle:nth-child(2) {
+  top: 60%;
+  left: 30%;
+  width: 200px;
+  height: 200px;
+  animation-delay: -5s;
+}
+
+.glow-circle-accent {
+  top: 40%;
+  left: 50%;
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(255, 80, 255, 0.15) 0%, transparent 70%);
+  animation-delay: -3s;
+}
+
+.hexagon-pattern {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15 10l15-10 15 10v20l-15 10-15-10z' fill='none' stroke='rgba(4, 230, 224, 0.05)' stroke-width='0.5'/%3E%3C/svg%3E");
+  background-size: 60px 60px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.floating-particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.floating-particles::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(circle at center, rgba(4, 230, 224, 0.3) 0, rgba(4, 230, 224, 0) 1px),
+    radial-gradient(circle at center, rgba(4, 230, 224, 0.2) 0, rgba(4, 230, 224, 0) 1px),
+    radial-gradient(circle at center, rgba(4, 230, 224, 0.1) 0, rgba(4, 230, 224, 0) 1px);
+  background-size: 12px 12px, 24px 24px, 36px 36px;
+  background-position: 0 0, 6px 6px, 12px 12px;
+  animation: particleFloat 60s linear infinite;
+}
+
+.cyber-circuit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10,50 L40,50 M60,50 L90,50 M50,10 L50,40 M50,60 L50,90 M30,30 L70,70 M30,70 L70,30' stroke='rgba(4, 230, 224, 0.03)' stroke-width='1' fill='none'/%3E%3Ccircle cx='50' cy='50' r='3' fill='rgba(4, 230, 224, 0.05)'/%3E%3Ccircle cx='50' cy='50' r='20' stroke='rgba(4, 230, 224, 0.04)' stroke-width='0.5' fill='none'/%3E%3C/svg%3E");
+  background-size: 100px 100px;
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.top-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 120px;
+  background: linear-gradient(to bottom, rgba(4, 230, 224, 0.15), transparent);
+  opacity: 0.6;
+  z-index: 0;
+  pointer-events: none;
 }

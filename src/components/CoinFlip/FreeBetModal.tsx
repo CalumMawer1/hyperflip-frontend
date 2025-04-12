@@ -1,20 +1,17 @@
-import React from 'react';
-import { useGame } from '../../providers/GameProvider';
-
+'use client';
+import React, { useState } from 'react';
+import { useGameState } from '../../providers/GameStateProvider';
+import { useAccount } from 'wagmi';
 
 const FreeBetModal= () => {
     const { 
-      isWhitelisted,
-      hasUsedFreeBet,
-      gameResult,
-      pendingBet,
-      showFreeBetModal,
-      setShowFreeBetModal,
-      address
-    } = useGame();
-  
-    const isEligibleForFreeBet = !!(isWhitelisted && !hasUsedFreeBet);
-    if (!isEligibleForFreeBet || hasUsedFreeBet || gameResult || pendingBet?.hasBet || !showFreeBetModal) {
+      canClaimFreeBet,
+    } = useGameState();
+    const { address } = useAccount();
+
+    const [isDismissed, setIsDismissed] = useState(false);
+    
+    if (!canClaimFreeBet || isDismissed) {
       return null;
     }
     return (
@@ -26,26 +23,13 @@ const FreeBetModal= () => {
           <div className="flex justify-center space-x-4">
             <button
               onClick={() => {
-                setShowFreeBetModal(false);
                 if (address) {
                   localStorage.setItem(`freeBet_modal_dismissed_${address.toLowerCase()}`, 'true');
                 }
               }}
               className="px-6 py-2 bg-[#04e6e0] text-black rounded-lg font-bold hover:bg-[#04e6e0]/80 transition-all"
             >
-              Got It
-            </button>
-            <button
-              onClick={() => {
-                console.log('Skipping free bet for now');
-                setShowFreeBetModal(false);
-                if (address) {
-                  localStorage.setItem(`freeBet_modal_dismissed_${address.toLowerCase()}`, 'true');
-                }
-              }}
-              className="px-6 py-2 bg-gray-700 text-white rounded-lg font-bold hover:bg-gray-600 transition-all"
-            >
-              Skip for Now
+              Ok
             </button>
           </div>
         </div>

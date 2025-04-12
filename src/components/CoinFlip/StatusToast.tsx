@@ -1,13 +1,17 @@
 import React from 'react';
-import { useGame } from '../../providers/GameProvider';
-
+import { useGameState } from '../../providers/GameStateProvider';
 
 
 const StatusToast = () => {
-    const { getTransactionStatusText, isReceiptLoading, isBetPending, isSettlePending, isFreeBetPending } = useGame();
+    const { betIsPending } = useGameState();
   
-    const message = getTransactionStatusText();
-    const isVisible = isReceiptLoading || isBetPending || isSettlePending || isFreeBetPending;
+    const getStatusText = () => {
+        if (betIsPending) return 'Processing your bet...';
+        return '';
+    };
+
+    const message = getStatusText();
+    const isVisible = message !== '';
 
     return (
         <div className={`fixed left-4 bottom-4 z-50 transition-all duration-300 transform ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>

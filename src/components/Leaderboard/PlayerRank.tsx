@@ -18,7 +18,7 @@ const PlayerRank: React.FC<PlayerRankProps> = ({ playerRank, totalPlayers }) => 
   
   return (
     <div className="inline-flex items-center px-3 py-2.5 rounded-full bg-black/40 border border-[#04e6e0]/30 backdrop-blur-sm 
-    transition-all duration-300 hover:bg-[#04e6e0]/10 hover:shadow-glow group">
+    transition-all duration-300 hover:bg-[#04e6e0]/10 hover:shadow-glow group font-primary">
       <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-[#04e6e0]/10 to-[#8B5CF6]/10 flex items-center
        justify-center border border-[#04e6e0]/20 group-hover:from-[#04e6e0]/20 group-hover:to-[#8B5CF6]/20 transition-all duration-300">
         {/* Crown Icon */}

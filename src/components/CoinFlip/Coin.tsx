@@ -2,6 +2,11 @@ import { CatCoinSVG, TailCoinSVG } from "./CoinSVG";
 import { motion, useAnimation, useMotionValue } from "framer-motion";
 import React, { useState, useEffect, useRef } from "react";
 
+// Add logging utility
+const logCoin = (action: string, data: any) => {
+  console.log(`[Coin] ${action}:`, data);
+};
+
 const xKeyframes = [
   0.0, 1.55, 2.94, 4.05, 4.76, 5.0, 4.76, 4.05, 2.94, 1.55, 0.0,
   -1.55, -2.94, -4.05, -4.76, -5.0, -4.76, -4.05, -2.94, -1.55, 0.0
@@ -15,27 +20,24 @@ interface CoinInputProps {
   isFlipping: boolean;
   result: number | null;
   side: number; // 0 for heads, 1 for tails
-  onSpinningComplete: () => void;
 }
 
-const Coin: React.FC<CoinInputProps> = ({
-  isFlipping,
-  result,
-  side,
-  onSpinningComplete,
-}) => {
+const Coin = React.memo(({ isFlipping, result, side }: CoinInputProps) => {
   const [isMounted, setIsMounted] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isLanding, setIsLanding] = useState(false);
-
   const [displayFace, setDisplayFace] = useState<number>(side);
+  
+  const prevSideRef = useRef(side);
+  
   console.log("result is being initialized to", result);
 
   console.log('[Coin] isFlipping:', isFlipping, 
             'isAnimating:', isAnimating, 
             'isLanding:', isLanding, 
             'displayFace:', displayFace, 
-            'result:', result);
+            'result:', result,
+            'side:', side);
 
   const continuousFlipControls = useAnimation();
   const flipControls = useAnimation();
@@ -44,6 +46,52 @@ const Coin: React.FC<CoinInputProps> = ({
   const isFlippingRef = useRef(isFlipping);
   const resultRef = useRef(result);
   const totalRotationRef = useRef(0);
+
+  // Log mounting
+  useEffect(() => {
+    logCoin("Component Mounted", { side, displayFace });
+    
+    return () => {
+      logCoin("Component Unmounting", { side, displayFace });
+    };
+  }, []);
+  
+  // Log prop changes
+  // Create a ref for the current animation version.
+const discreteAnimationVersionRef = useRef(0);
+
+useEffect(() => {
+  // Increment the version on each side change.
+  discreteAnimationVersionRef.current += 1;
+  const currentAnimationVersion = discreteAnimationVersionRef.current;
+
+  // Only start the discrete flip animation if conditions are met.
+  if (side !== prevSideRef.current && !isFlipping && !isAnimating && !isLanding && result === null) {
+    flipControls
+      .start({
+        rotateY: 90,
+        transition: { duration: 0.25, ease: "easeInOut" },
+      })
+      .then(() => {
+        // Before applying the change, verify that no new animation has been started.
+        if (discreteAnimationVersionRef.current === currentAnimationVersion) {
+          setDisplayFace(side);
+          flipControls.set({ rotateY: -90 });
+          return flipControls.start({
+            rotateY: 0,
+            transition: { duration: 0.25, ease: "easeInOut" },
+          });
+        }
+      })
+      .then(() => {
+        if (discreteAnimationVersionRef.current === currentAnimationVersion) {
+          logCoin("Completed Discrete Flip Animation", { newDisplayFace: side });
+        }
+      });
+  }
+  prevSideRef.current = side;
+}, [side, isFlipping, isAnimating, isLanding, result]);
+
 
   useEffect(() => {
     isFlippingRef.current = isFlipping;
@@ -98,7 +146,7 @@ const Coin: React.FC<CoinInputProps> = ({
       //console.log("stopping spin")
       setIsAnimating(false);
       setIsLanding(false);
-      onSpinningComplete();
+      // onSpinningComplete();
     }
   };
 
@@ -106,28 +154,7 @@ const Coin: React.FC<CoinInputProps> = ({
     if (isMounted && isFlipping && result === null && !isAnimating) {
       spinLoop();
     }
-  }, [isFlipping, result, isMounted, isAnimating, side]);
-
-  // discrete flip
-  useEffect(() => {
-    if (result === null && !isFlipping && !isAnimating && !isLanding) {
-      if (side !== displayFace) {
-        flipControls
-          .start({
-            rotateY: 90,
-            transition: { duration: 0.25, ease: "easeInOut" },
-          })
-          .then(() => {
-            setDisplayFace(side);
-            flipControls.set({ rotateY: -90 });
-            return flipControls.start({
-              rotateY: 0,
-              transition: { duration: 0.25, ease: "easeInOut" },
-            });
-          });
-      }
-    }
-  }, [side, isFlipping, isAnimating, isLanding, displayFace, flipControls, result]);
+  }, [isFlipping, result, isMounted, isAnimating]);
 
   // render continuous flip
   if (isMounted && (isFlipping || isAnimating || isLanding)) {
@@ -220,6 +247,6 @@ const Coin: React.FC<CoinInputProps> = ({
         </div>
     </div>
   );
-};
+});
 
 export default Coin;
