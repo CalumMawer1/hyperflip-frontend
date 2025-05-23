@@ -53,8 +53,7 @@ export default function BetView({
 }: BetViewProps
 ) {
   const [canPlaceBet, setCanPlaceBet] = useState(false);
-  console.log("[BetView] selectedChoice", selectedChoice, "selectedAmount", selectedAmount, "canPlaceBet", canPlaceBet);
-  // Define simple conditions for button states
+
   useEffect(() => {
     if (isPlacingBet) {
       setCanPlaceBet(false);

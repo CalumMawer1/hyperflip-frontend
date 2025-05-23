@@ -12,8 +12,6 @@ export async function GET(
   { params }: { params: { walletAddress: string } }
 ) {
 
-  console.log('API_BASE_URL', API_BASE_URL);
-  console.log('API_KEY', API_KEY);
   
   try {
     const { walletAddress } = params;
@@ -83,9 +81,7 @@ export async function GET(
       playerRankByTotalWagered: data.rank_by_total_wagered || null
     };
 
-    console.log('transformed data', transformedData)
     
-    // console.log('transformed data', transformedData)
     const responseData = NextResponse.json(transformedData);
     
     // prevent caching

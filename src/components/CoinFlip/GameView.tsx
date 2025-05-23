@@ -34,19 +34,6 @@ export default function GameView() {
     canClaimFreeBet,
     isConnected
   } = useGameState();
-
-  console.log("[NewGameView] Game state:", {
-    view,
-    choice,
-    amount,
-    isLoading,
-    betIsPending,
-    resultIsPending,
-    settledBetResult,
-    placeBetError,
-    canClaimFreeBet,
-    isConnected
-  });
   
 
   // Determine which view to render based on game state from hook

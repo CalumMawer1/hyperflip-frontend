@@ -11,10 +11,6 @@ import { useBetHistory, NewBet } from '../providers/BetHistoryContext';
 import { useUserProvider } from '../providers/UserProvider';
 
 
-// Add logging utility
-const logBet = (action: string, data: any) => {
-  console.log(`[PlaceBet] ${action}:`, data);
-};
 
 // Define the event structure to match contract events
 type BetSettledEvent = Log & {
@@ -68,18 +64,6 @@ function calculateTotalValue(betAmount: string, pythFee: bigint) {
     // Total = bet amount + Pyth fee + deployer fee
     const totalValueWei = betAmountWei + pythFee + deployerFee;
     
-    logBet("Calculated Total Bet Value", { 
-        betAmount, 
-        betAmountWei: betAmountWei.toString(),
-        pythFeeWei: pythFee.toString(),
-        deployerFeeWei: deployerFee.toString(), // Log the deployer fee too
-        totalValueWei: totalValueWei.toString(),
-        betAmountEther: Number(betAmountWei) / 1e18,
-        pythFeeEther: Number(pythFee) / 1e18,
-        deployerFeeEther: Number(deployerFee) / 1e18, // Log in HYPE
-        totalValueEther: Number(totalValueWei) / 1e18
-    });
-    
     return totalValueWei.toString();
 }
 
@@ -107,10 +91,6 @@ export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult 
     
     useEffect(() => {
         if (pythFee) {
-            logBet("Received Pyth Fee", { 
-                pythFeeWei: pythFee.toString(),
-                pythFeeEther: Number(pythFee) / 1e18 
-            });
             setCurrPythFee(pythFee as bigint);
         }
     }, [pythFee]);
@@ -142,7 +122,6 @@ export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult 
 
     // place regular bet 
     const placeBet = useCallback((amount: string, choice: number) => {
-        logBet("Placing Regular Bet", { amount, choice });
         setBetIsPending(true);
         setSettledBetResult(null);
         
@@ -154,7 +133,6 @@ export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult 
             isFreeBet: false
         };
         
-        logBet("Added to pending bets", { pendingBet: newBet });
         
         const newRandomNumber = generateRandomNumber();
 
@@ -178,12 +156,10 @@ export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult 
             },
             { 
                 onSuccess: () => {
-                    console.log("[usePlaceBet] Bet placed successfully");
                     setBetIsPending(false);
                     setResultIsPending(true);
                 },
                 onError: () => {
-                    console.log("[usePlaceBet] Bet placement failed");
                     setBetIsPending(false);
                 }
             }
@@ -193,7 +169,6 @@ export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult 
 
 
     const placeFreeBet = useCallback((choice: number) => {
-        logBet("Placing Free Bet", { choice });
         setBetIsPending(true);
         setSettledBetResult(null);
         
@@ -205,16 +180,9 @@ export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult 
             isFreeBet: true
         };
         
-        logBet("Added free bet to pending bets", { pendingBet: newBet});
         
         // generate new random number for each bet 
         const newRandomNumber = generateRandomNumber();
-    
-        logBet("Executing Free Bet Contract Call", { 
-            functionName: 'placeFreeBet',
-            choice,
-            randomNumber: newRandomNumber.substring(0, 18) + '...' // Log partial for privacy
-        });
         
         executeBet(
             {
@@ -226,12 +194,10 @@ export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult 
             },
             {
                 onError: () => {
-                    console.log("[usePlaceBet] Failed to place free bet");
                     setBetIsPending(false);
                     setPlaceBetError(new Error("Failed to place free bet"));
                 },
                 onSuccess: () => {
-                    console.log("[usePlaceBet] Free bet placed successfully");
                     setBetIsPending(false);
                     setResultIsPending(true);
                 }
@@ -259,7 +225,6 @@ export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult 
                     
                     // Skip if we've already processed this event in any hook instance
                     if (processedBetEvents.has(eventId)) {
-                        logBet("[usePlaceBet] Skipping already processed event", { eventId });
                         return;
                     }
                     
@@ -269,16 +234,8 @@ export function usePlaceBet(options = { watchEvents: true }): UsePlaceBetResult 
                     const typedLog = log as unknown as BetSettledEvent;
                     const {args} = typedLog;
                     
-                    logBet("[usePlaceBet] BetSettled Event Received", {
-                        player: args.player,
-                        amount: Number(args.amount) / 1e18,
-                        won: args.won,
-                        result: args.result,
-                        currentAddress: address,
-                    });
                     
                     if (args.player.toLowerCase() === address?.toLowerCase()) {
-                        console.log("[usePlaceBet] BetSettled event received for current user");
                         
                         const betAmount = Number(args.amount) / 1e18; 
                         

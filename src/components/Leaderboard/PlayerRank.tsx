@@ -1,5 +1,7 @@
 import React from 'react';
 
+const debug = process.env.NODE_ENV === 'development';
+
 interface PlayerRankProps {
   playerRank?: number | string | null;
   totalPlayers: number;
@@ -12,7 +14,9 @@ const PlayerRank: React.FC<PlayerRankProps> = ({ playerRank, totalPlayers }) => 
       ? parseInt(playerRank, 10) 
       : playerRank;
 
-  console.log("PlayerRank Component - Processed Rank:", rankNumber);
+  if (debug) {
+    console.log("PlayerRank Component - Processed Rank:", rankNumber);
+  }
 
   if (!rankNumber) return null;
   

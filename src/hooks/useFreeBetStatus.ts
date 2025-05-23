@@ -51,8 +51,6 @@ export function useFreeBetStatus(): FreeBetStatus {
       refetchHasUsedFreeBet();
       refetchFreeBetAmount();
     }, [refetchIsWhitelisted, refetchHasUsedFreeBet, refetchFreeBetAmount]);
-
-    console.log("[useFreeBetStatus] isWhitelisted", isWhitelisted, "hasUsedFreeBet", hasUsedFreeBet, "freeBetAmount", freeBetAmount);
     
     return {
       isFreeBetEligible: Boolean(isWhitelisted && !hasUsedFreeBet),

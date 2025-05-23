@@ -53,7 +53,6 @@ const LeaderboardContent: React.FC = () => {
       const offsetInBlock = firstItemIndex % BLOCK_SIZE;
 
       const primaryBlock = await fetchBlock(blockIndex, isConnected ? address : undefined, sortBy);
-      console.log("Received primary block data:", primaryBlock);
 
       let pageData = primaryBlock.data.slice(offsetInBlock, offsetInBlock + itemsPerPage);
 
@@ -134,14 +133,10 @@ const LeaderboardContent: React.FC = () => {
             localStorage.removeItem(key);
           }
         });
-        console.log('Cleared leaderboard cache for new sort option');
       }
       
       setSortBy(newSortBy);
       setCurrentPage(1);
-      // Add console log to verify sort option
-      console.log('Changed sort option to:', newSortBy);
-      // Fetch data will be triggered by useEffect
     }
   };
 
@@ -162,12 +157,6 @@ const LeaderboardContent: React.FC = () => {
               <div className="px-4 py-2">
                 {(() => {
                   const playerRank = getPlayerRankBySortOption(sortBy);
-                  console.log("Current player rank data:", {
-                    sortBy,
-                    playerRank,
-                    isRankLoading,
-                    loading
-                  });
                   
                   return playerRank !== undefined && playerRank !== null ? (
                     <PlayerRank 

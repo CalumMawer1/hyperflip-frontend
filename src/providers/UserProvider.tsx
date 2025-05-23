@@ -5,7 +5,7 @@ import { Address } from "viem";
 import { useAccount } from 'wagmi';
 import { getUserData } from '../services/apiService';
 
-
+const debug = process.env.NODE_ENV === 'development';
 const PENDING_POINTS_KEY_PREFIX = 'hyperflip_pending_points_';
 
 interface UserData {
@@ -110,7 +110,9 @@ export function UserProvider({ children }: UserProviderInput) {
 
             if (data !== null) {
                 const serverPoints = (data.totalWagered || 0) * 100;
-                console.log("User data received:", data); 
+                if (debug) {
+                    console.log("User data received:", data); 
+                }
 
                 setUserData({
                     numBets: data.totalBets || 0,
@@ -126,10 +128,14 @@ export function UserProvider({ children }: UserProviderInput) {
                 setNumPoints(serverPoints);
 
             } else {
-                console.log("User data received: null");
+                if (debug) {
+                    console.log("User data received: null");
+                }
             }
         } catch (error) {
-            console.error("Error fetching user data:", error);
+            if (debug) {
+                console.error("Error fetching user data:", error);
+            }
         } finally {
             setIsLoading(false);
         }

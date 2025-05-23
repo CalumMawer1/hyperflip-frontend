@@ -7,6 +7,7 @@ import { StyledComponentsRegistry } from '../lib/registry';
 import { BetHistoryProvider } from '../providers/BetHistoryContext';
 import { Metadata } from 'next';
 import { tektur, brunoAce } from './fonts';
+import { UnderConstruction } from '../components/UnderConstruction';
 
 export const metadata: Metadata = {
   title: 'HyperFlip - Coin Flip Game',
@@ -33,14 +34,7 @@ export default function RootLayout({
       </head>
       <body className={GeistSans.className}>
         <StyledComponentsRegistry>
-          <WalletProvider>
-            <UserProvider>
-              <BetHistoryProvider>
-                <LogoStyles />
-                {children}
-              </BetHistoryProvider>
-            </UserProvider>
-          </WalletProvider>
+          <UnderConstruction />
         </StyledComponentsRegistry>
       </body>
     </html>

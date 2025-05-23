@@ -2,10 +2,7 @@ import { CatCoinSVG, TailCoinSVG } from "./CoinSVG";
 import { motion, useAnimation, useMotionValue } from "framer-motion";
 import React, { useState, useEffect, useRef } from "react";
 
-// Add logging utility
-const logCoin = (action: string, data: any) => {
-  console.log(`[Coin] ${action}:`, data);
-};
+
 
 const xKeyframes = [
   0.0, 1.55, 2.94, 4.05, 4.76, 5.0, 4.76, 4.05, 2.94, 1.55, 0.0,
@@ -29,15 +26,6 @@ const Coin = React.memo(({ isFlipping, result, side }: CoinInputProps) => {
   const [displayFace, setDisplayFace] = useState<number>(side);
   
   const prevSideRef = useRef(side);
-  
-  console.log("result is being initialized to", result);
-
-  console.log('[Coin] isFlipping:', isFlipping, 
-            'isAnimating:', isAnimating, 
-            'isLanding:', isLanding, 
-            'displayFace:', displayFace, 
-            'result:', result,
-            'side:', side);
 
   const continuousFlipControls = useAnimation();
   const flipControls = useAnimation();
@@ -46,17 +34,7 @@ const Coin = React.memo(({ isFlipping, result, side }: CoinInputProps) => {
   const isFlippingRef = useRef(isFlipping);
   const resultRef = useRef(result);
   const totalRotationRef = useRef(0);
-
-  // Log mounting
-  useEffect(() => {
-    logCoin("Component Mounted", { side, displayFace });
-    
-    return () => {
-      logCoin("Component Unmounting", { side, displayFace });
-    };
-  }, []);
   
-  // Log prop changes
   // Create a ref for the current animation version.
 const discreteAnimationVersionRef = useRef(0);
 
@@ -83,11 +61,6 @@ useEffect(() => {
           });
         }
       })
-      .then(() => {
-        if (discreteAnimationVersionRef.current === currentAnimationVersion) {
-          logCoin("Completed Discrete Flip Animation", { newDisplayFace: side });
-        }
-      });
   }
   prevSideRef.current = side;
 }, [side, isFlipping, isAnimating, isLanding, result]);
@@ -124,14 +97,11 @@ useEffect(() => {
       let targetRotation = 0;
       // Compare the result with the provided side directly.
       if (resultRef.current === side) {
-        //console.log('current == side', 'currentRotation:', currentRotation, 'currentMod', currentMod)
         targetRotation = currentRotation + ((360 - currentMod) % 360 || 360);
       } else {
         if (currentMod < 180) {
-          //console.log('current != side', 'currentRotation:', currentRotation, 'currentMod', currentMod)
           targetRotation = currentRotation + (180 - currentMod);
         } else {
-          //console.log('current != side', 'currentRotation:', currentRotation, 'currentMod', currentMod)
           targetRotation = currentRotation + (540 - currentMod);
         }
       }
@@ -143,7 +113,6 @@ useEffect(() => {
         rotateX: targetRotation,
         transition: { duration: 1.5, ease: "circOut" },
       });
-      //console.log("stopping spin")
       setIsAnimating(false);
       setIsLanding(false);
       // onSpinningComplete();

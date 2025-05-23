@@ -23,7 +23,6 @@ export async function POST(request: Request) {
         { status: 413 }
       );
     }
-    console.log("placing bet request at url", API_BASE_URL)
 
     const betRequest: BetRequest = await request.json();
 
@@ -82,7 +81,6 @@ export async function POST(request: Request) {
       placed_at: betRequest.placed_at
     };
 
-    console.log("Sending bet to backend:", golangBetRequest);
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -102,7 +100,6 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json();
-    console.log("successfully placed bet", data)
 
     return NextResponse.json(data);
 

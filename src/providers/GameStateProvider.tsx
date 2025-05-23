@@ -6,10 +6,13 @@ import { useFreeBetStatus } from '../hooks/useFreeBetStatus';
 import { useAccount } from 'wagmi';
 import { SettledBetResult } from '../utils/interfaces';
 
+const debug = process.env.NODE_ENV === 'development';
 
 // Add logging utility
 const logGameState = (action: string, data: any) => {
-  console.log(`[GameState] ${action}:`, data);
+  if (debug) {
+    console.log(`[GameState] ${action}:`, data);
+  }
 };
 
 export type GameView = 'BETTING' | 'FLIPPING' | 'RESULT';
